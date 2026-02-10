@@ -1,0 +1,131 @@
+package com.cbkj.infrastructure.executor;
+
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
+import javax.sql.DataSource;
+import java.sql.*;
+
+/**
+ * SQL执行器
+ * 负责执行SQL脚本和事务控制
+ */
+public class SqlExecutor {
+
+    private static final Logger LOGGER = LoggerFactory.getLogger(SqlExecutor.class);
+
+    private final DataSource dataSource;
+
+    public SqlExecutor(DataSource dataSource) {
+        this.dataSource = dataSource;
+    }
+
+    /**
+     * 在事务中执行SQL脚本
+     *
+     * @param sqlContent SQL脚本内容
+     * @param scriptName 脚本名称（用于日志）
+     * @return 执行耗时（毫秒）
+     * @throws Exception 执行失败时抛出异常
+     */
+    public long executeInTransaction(String sqlContent, String scriptName) throws Exception {
+        Connection connection = null;
+        boolean originalAutoCommit = false;
+        long startTime = System.currentTimeMillis();
+
+        try {
+            connection = dataSource.getConnection();
+            originalAutoCommit = connection.getAutoCommit();
+            connection.setAutoCommit(false);
+
+            LOGGER.info("[SqlExecutor] [PATH:{}] [TIME:{}] [SQL:START] Executing script: {}",
+                    scriptName, new java.util.Date(), scriptName);
+
+            // 执行SQL
+            executeSql(connection, sqlContent, scriptName);
+
+            // 提交事务
+            connection.commit();
+
+            long executionTime = System.currentTimeMillis() - startTime;
+            LOGGER.info("[SqlExecutor] [PATH:{}] [TIME:{}] [SQL:SUCCESS] Script executed successfully in {}ms",
+                    scriptName, new java.util.Date(), executionTime);
+
+            return executionTime;
+
+        } catch (Exception e) {
+            // 回滚事务
+            if (connection != null) {
+                try {
+                    connection.rollback();
+                    LOGGER.error("[SqlExecutor] [PATH:{}] [TIME:{}] [SQL:ROLLBACK] Transaction rolled back",
+                            scriptName, new java.util.Date());
+                } catch (SQLException rollbackEx) {
+                    LOGGER.error("[SqlExecutor] [PATH:{}] [TIME:{}] [SQL:ROLLBACK_FAILED] Failed to rollback transaction",
+                            scriptName, new java.util.Date(), rollbackEx);
+                }
+            }
+
+            long executionTime = System.currentTimeMillis() - startTime;
+            LOGGER.error("[SqlExecutor] [PATH:{}] [TIME:{}] [SQL:FAILED] Script execution failed after {}ms: {}",
+                    scriptName, new java.util.Date(), executionTime, e.getMessage(), e);
+
+            throw new Exception("SQL execution failed for script: " + scriptName, e);
+
+        } finally {
+            // 恢复自动提交设置并关闭连接
+            if (connection != null) {
+                try {
+                    connection.setAutoCommit(originalAutoCommit);
+                } catch (SQLException e) {
+                    LOGGER.warn("[SqlExecutor] Failed to restore auto-commit setting", e);
+                }
+                try {
+                    connection.close();
+                } catch (SQLException e) {
+                    LOGGER.warn("[SqlExecutor] Failed to close connection", e);
+                }
+            }
+        }
+    }
+
+    /**
+     * 执行SQL内容
+     */
+    private void executeSql(Connection connection, String sqlContent, String scriptName) throws SQLException {
+        // 按分号分割SQL语句（简单的SQL分割，不考虑存储过程等复杂情况）
+        String[] statements = sqlContent.split(";");
+        int statementCount = 0;
+
+        for (String statement : statements) {
+            String trimmedStatement = statement.trim();
+            if (trimmedStatement.isEmpty()) {
+                continue;
+            }
+
+            statementCount++;
+            
+            try (Statement stmt = connection.createStatement()) {
+                LOGGER.debug("[SqlExecutor] [PATH:{}] Executing statement #{}: {}",
+                        scriptName, statementCount, 
+                        trimmedStatement.substring(0, Math.min(100, trimmedStatement.length())));
+                
+                stmt.execute(trimmedStatement);
+            } catch (SQLException e) {
+                LOGGER.error("[SqlExecutor] [PATH:{}] Statement #{} failed: {}",
+                        scriptName, statementCount, trimmedStatement);
+                throw e;
+            }
+        }
+
+        LOGGER.info("[SqlExecutor] [PATH:{}] Executed {} SQL statement(s)", 
+                scriptName, statementCount);
+    }
+
+    /**
+     * 获取数据库连接（用于非事务操作）
+     */
+    public Connection getConnection() throws SQLException {
+        return dataSource.getConnection();
+    }
+}

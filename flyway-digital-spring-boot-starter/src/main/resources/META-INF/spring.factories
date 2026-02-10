@@ -1,0 +1,3 @@
+# Spring Boot Auto-Configuration for FlywayDigital
+org.springframework.boot.autoconfigure.EnableAutoConfiguration=\
+com.cbkj.infrastructure.autoconfigure.FlywayDigitalAutoConfiguration
