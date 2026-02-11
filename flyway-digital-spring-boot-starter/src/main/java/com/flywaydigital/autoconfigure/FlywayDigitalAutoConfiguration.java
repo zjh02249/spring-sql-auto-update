@@ -16,6 +16,7 @@ import org.springframework.context.annotation.Configuration;
 import org.springframework.core.io.ResourceLoader;
 
 import javax.sql.DataSource;
+import java.util.Map;
 import java.util.Objects;
 
 /**
@@ -63,16 +64,25 @@ public class FlywayDigitalAutoConfiguration {
 
     /**
      * 创建FlywayDigital Bean并执行迁移
+     * 支持动态数据源场景，优先使用名为 "flywayDigitalDataSource" 的数据源
      */
     @Bean(initMethod = "migrate")
     @ConditionalOnMissingBean
     @ConditionalOnClass(DataSource.class)
-    public FlywayDigital flywayDigital(DataSource dataSource, FlywayDigitalConfig config) throws Exception {
-        Objects.requireNonNull(dataSource, "DataSource must not be null");
+    public FlywayDigital flywayDigital(
+            @Autowired(required = false) DataSource flywayDigitalDataSource,
+            @Autowired(required = false) Map<String, DataSource> allDataSources,
+            FlywayDigitalConfig config) throws Exception {
+        
         Objects.requireNonNull(config, "FlywayDigitalConfig must not be null");
 
+        // 确定要使用的数据源
+        DataSource dataSource = determineDataSource(flywayDigitalDataSource, allDataSources);
+        Objects.requireNonNull(dataSource, "DataSource must not be null. Please ensure a DataSource bean is available.");
+
         LOGGER.info("[FlywayDigitalAutoConfiguration] Initializing FlywayDigital");
-        LOGGER.info("[FlywayDigitalAutoConfiguration] DataSource: {}", dataSource);
+        LOGGER.info("[FlywayDigitalAutoConfiguration] DataSource: {} (class: {})", 
+                dataSource, dataSource.getClass().getName());
         LOGGER.info("[FlywayDigitalAutoConfiguration] Config: {}", config);
 
         FlywayDigital flywayDigital = new FlywayDigital(dataSource, config);
@@ -81,6 +91,46 @@ public class FlywayDigitalAutoConfiguration {
         // 这里不需要手动调用
         
         return flywayDigital;
+    }
+    
+    /**
+     * 确定要使用的数据源
+     * 优先级：
+     * 1. 显式定义的 flywayDigitalDataSource bean
+     * 2. 名为 "masterDataSource" 或 "dataSource" 的 bean
+     * 3. 第一个可用的 DataSource
+     */
+    private DataSource determineDataSource(DataSource flywayDigitalDataSource, 
+                                          Map<String, DataSource> allDataSources) {
+        // 1. 优先使用显式定义的 flywayDigitalDataSource
+        if (flywayDigitalDataSource != null) {
+            LOGGER.info("[FlywayDigitalAutoConfiguration] Using explicitly defined 'flywayDigitalDataSource'");
+            return flywayDigitalDataSource;
+        }
+        
+        if (allDataSources == null || allDataSources.isEmpty()) {
+            LOGGER.warn("[FlywayDigitalAutoConfiguration] No DataSource beans found in application context");
+            return null;
+        }
+        
+        LOGGER.debug("[FlywayDigitalAutoConfiguration] Found {} DataSource bean(s): {}", 
+                allDataSources.size(), allDataSources.keySet());
+        
+        // 2. 查找主数据源（常见命名）
+        String[] preferredNames = {"masterDataSource", "dataSource", "primaryDataSource"};
+        for (String name : preferredNames) {
+            DataSource ds = allDataSources.get(name);
+            if (ds != null) {
+                LOGGER.info("[FlywayDigitalAutoConfiguration] Using DataSource bean named '{}'", name);
+                return ds;
+            }
+        }
+        
+        // 3. 返回第一个可用的 DataSource
+        Map.Entry<String, DataSource> firstEntry = allDataSources.entrySet().iterator().next();
+        LOGGER.info("[FlywayDigitalAutoConfiguration] Using first available DataSource bean named '{}'", 
+                firstEntry.getKey());
+        return firstEntry.getValue();
     }
 
 }

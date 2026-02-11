@@ -472,6 +472,222 @@ Failed to obtain JDBC Connection
 2. 确认数据库服务是否启动
 3. 检查网络连接
 
+### 问题 5：动态数据源不生效（Spring Boot 3.x）
+
+**现象**：使用动态数据源（如 AbstractRoutingDataSource）时，FlywayDigital 没有执行迁移
+
+**原因**：Spring Boot 3.x 完全移除了对 `spring.factories` 的传统支持，改为使用 `META-INF/spring/org.springframework.boot.autoconfigure.AutoConfiguration.imports` 文件
+
+**解决方案**：
+
+1. **升级 FlywayDigital 到 1.2.0 或更高版本**（已修复此问题）
+
+2. **如果无法升级，可以手动创建自动配置导入文件**：
+
+   在你的项目中创建文件：
+   `src/main/resources/META-INF/spring/org.springframework.boot.autoconfigure.AutoConfiguration.imports`
+
+   内容：
+   ```
+   com.cbkj.infrastructure.autoconfigure.FlywayDigitalAutoConfiguration
+   ```
+
+3. **显式配置要使用的数据源**（动态数据源场景）：
+
+   ```yaml
+   flyway-digital:
+     # 指定要使用的主数据源 bean 名称
+     dynamic-datasource-bean-name: masterDataSource
+     # 启用调试模式查看详细加载信息
+     debug: true
+   ```
+
+4. **自定义数据源 bean 名称**：
+
+   如果自动检测无法找到正确的数据源，可以显式创建一个名为 `flywayDigitalDataSource` 的 bean：
+
+   ```java
+   @Configuration
+   public class FlywayDigitalDataSourceConfig {
+       
+       @Autowired
+       private DynamicDataSource dynamicDataSource;
+       
+       @Bean
+       public DataSource flywayDigitalDataSource() {
+           // 从动态数据源中获取实际的主数据源
+           // 这里需要根据你的 DynamicDataSource 实现来调整
+           return dynamicDataSource.getResolvedDataSources().get("master");
+       }
+   }
+   ```
+
+---
+
+## 🔄 动态数据源配置指南
+
+### 概述
+
+当使用动态数据源（如基于 AbstractRoutingDataSource 的实现）时，FlywayDigital 需要知道应该使用哪个**实际的数据源**来执行数据库迁移。
+
+这是因为动态数据源通常是一个包装器/路由器，它本身不直接持有数据库连接，而是在运行时根据上下文路由到实际的数据源（如主库、从库等）。
+
+### 自动检测机制
+
+FlywayDigital 使用以下优先级自动检测要使用的数据源：
+
+| 优先级 | 检测策略 | 说明 |
+|--------|----------|------|
+| 1 | 显式配置 | 检查 `flyway-digital.dynamic-datasource-bean-name` 配置 |
+| 2 | 命名约定 | 查找名为 `masterDataSource` 的 bean |
+| 3 | 标准命名 | 查找名为 `dataSource` 的 bean |
+| 4 | 备选方案 | 使用第一个可用的 DataSource bean |
+
+### 配置方法
+
+#### 方法 1：通过配置指定（推荐）
+
+```yaml
+flyway-digital:
+  # 指定要使用的主数据源 bean 名称
+  # 这个名称应该对应你实际的数据源（如 HikariDataSource、DruidDataSource 等）
+  dynamic-datasource-bean-name: masterDataSource
+  
+  # 启用调试模式查看详细的自动配置过程
+  debug: true
+```
+
+#### 方法 2：显式创建数据源 bean
+
+如果自动检测无法满足需求，可以显式创建一个名为 `flywayDigitalDataSource` 的 bean：
+
+```java
+@Configuration
+public class FlywayDigitalDataSourceConfig {
+    
+    @Autowired
+    private DynamicDataSource dynamicDataSource;
+    
+    /**
+     * 为 FlywayDigital 创建专门的数据源
+     * 这个方法名可以任意，但建议保持一致性
+     */
+    @Bean
+    public DataSource flywayDigitalDataSource() {
+        // 从动态数据源中获取实际的主数据源
+        // 注意：这里的实现取决于你的 DynamicDataSource 具体实现
+        
+        // 方式 1：如果 DynamicDataSource 提供了获取 resolved data sources 的方法
+        // Map<Object, DataSource> resolved = dynamicDataSource.getResolvedDataSources();
+        // return resolved.get("master");
+        
+        // 方式 2：直接返回 DynamicDataSource 本身（如果它实现了 DataSource 接口）
+        // return dynamicDataSource;
+        
+        // 方式 3：注入实际的数据源 bean
+        // @Autowired private DataSource masterDataSource;
+        // return masterDataSource;
+        
+        throw new UnsupportedOperationException(
+            "请根据你的 DynamicDataSource 实现来修改此方法，" +
+            "返回实际的数据源（如 HikariDataSource、DruidDataSource 等）"
+        );
+    }
+}
+```
+
+#### 方法 3：使用配置类排除动态数据源
+
+如果你的 `DynamicDataSource` 是一个包装器，可以在配置中明确排除它：
+
+```java
+@Configuration
+public class FlywayDigitalExcludeConfig {
+    
+    @Autowired
+    @Qualifier("masterDataSource")  // 注入实际的数据源，而不是 DynamicDataSource
+    private DataSource masterDataSource;
+    
+    /**
+     * 创建一个排除 DynamicDataSource 干扰的数据源
+     */
+    @Primary  // 标记为 Primary，让 FlywayDigitalAutoConfiguration 优先使用这个
+    @Bean
+    public DataSource flywayDigitalDataSource() {
+        return masterDataSource;
+    }
+}
+```
+
+### 故障排除
+
+#### 问题 1：找不到数据源
+
+**错误信息**：
+```
+DataSource must not be null. Please ensure a DataSource bean is available.
+```
+
+**可能原因和解决方案**：
+
+1. **数据源未创建**：
+   - 检查你的 DataSourceConfig 是否被正确加载
+   - 确认 `@Configuration` 类位于主应用类同级或子包中
+
+2. **数据源名称不匹配**：
+   - 如果你配置了 `flyway-digital.dynamic-datasource-bean-name`，确保该名称的 bean 存在
+   - 使用 `debug: true` 查看可用的数据源列表
+
+3. **DataSource bean 被排除**：
+   - 检查是否有 `@ComponentScan` 排除了 DataSource 配置类
+   - 确认没有使用 `@ConditionalOnProperty` 错误地禁用了数据源
+
+#### 问题 2：使用了错误的动态数据源
+
+**现象**：FlywayDigital 执行了迁移，但数据库没有实际变更
+
+**原因**：FlywayDigital 使用了 `DynamicDataSource` 本身，而不是它包装的实际数据源
+
+**解决方案**：
+
+1. 配置 `flyway-digital.dynamic-datasource-bean-name` 指向实际的数据源（如 `masterDataSource`）
+
+2. 或者创建一个 `flywayDigitalDataSource` bean，从 `DynamicDataSource` 中提取实际的数据源
+
+3. 在 `DynamicDataSource` 中添加一个方法，返回默认的目标数据源
+
+#### 问题 3：Spring Boot 3.x 不加载自动配置
+
+**现象**：没有任何 FlywayDigital 相关的日志输出
+
+**原因**：从 Spring Boot 2.7 开始，自动配置注册方式发生了变化。Spring Boot 3.x 不再支持传统的 `spring.factories` 方式。
+
+**解决方案**：
+
+1. **升级到 FlywayDigital 1.2.0+**（已修复此问题）
+
+2. **如果无法升级**，手动创建自动配置导入文件：
+
+   在你的项目中创建文件：
+   `src/main/resources/META-INF/spring/org.springframework.boot.autoconfigure.AutoConfiguration.imports`
+   
+   内容：
+   ```
+   com.cbkj.infrastructure.autoconfigure.FlywayDigitalAutoConfiguration
+   ```
+
+### 最佳实践
+
+1. **明确指定数据源**：在多数据源场景下，始终通过 `dynamic-datasource-bean-name` 明确指定要使用的数据源，避免自动检测带来的不确定性。
+
+2. **启用调试模式**：在开发和测试环境启用 `debug: true`，这可以帮助快速定位数据源相关的问题。
+
+3. **分离迁移数据源**：如果可能，为数据库迁移创建一个独立的数据源 bean（如 `flywayDigitalDataSource`），这样可以完全控制迁移使用的连接池配置。
+
+4. **测试验证**：在生产环境部署前，在测试环境验证动态数据源场景下的迁移行为，确保实际的数据库变更符合预期。
+
+5. **监控和告警**：对数据库迁移添加监控，如果迁移失败或长时间未完成，及时发出告警。这在动态数据源场景下尤为重要，因为数据源切换可能导致意外的行为。
+
 ---
 
 ## 📝 示例项目

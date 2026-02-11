@@ -7,7 +7,7 @@
 
     <groupId>com.cbkj.infrastructure</groupId>
     <artifactId>flyway-digital</artifactId>
-    <version>1.1.0</version>
+    <version>1.2.1</version>
     <packaging>pom</packaging>
 
     <name>Flyway Digital - Lightweight SQL Migration Tool</name>
@@ -32,9 +32,38 @@
         <maven-surefire-plugin.version>3.1.2</maven-surefire-plugin.version>
     </properties>
 
+    <!--
+        ============================================
+        模块分类说明（部署规范）
+        ============================================
+        
+        【核心模块 - 需要发布到 Maven 仓库】
+        这些模块会被其他项目依赖，必须发布到 Maven 仓库
+        - flyway-digital-core: 核心迁移引擎
+        - flyway-digital-spring-boot-starter: Spring Boot 自动配置 Starter
+        
+        【示例模块 - 不需要发布到 Maven 仓库】
+        这些模块仅用于演示，已配置 maven.deploy.skip=true
+        部署时会自动跳过，不发布到 Maven 仓库
+        - flyway-digital-samples (聚合模块)
+          - spring-boot-sample: Spring Boot 集成示例
+          - standalone-sample: 独立使用示例
+        
+        【发布命令】
+        推荐只发布核心模块：
+        mvn clean deploy -DskipTests \
+            -pl flyway-digital-core,flyway-digital-spring-boot-starter \
+            -am
+        
+        详细说明请参考 BUILD_AND_DEPLOY.md
+        ============================================
+    -->
     <modules>
+        <!-- 核心模块（需要发布到 Maven 仓库） -->
         <module>flyway-digital-core</module>
         <module>flyway-digital-spring-boot-starter</module>
+        
+        <!-- 示例模块（不需要发布到 Maven 仓库） -->
         <module>flyway-digital-samples</module>
     </modules>
 

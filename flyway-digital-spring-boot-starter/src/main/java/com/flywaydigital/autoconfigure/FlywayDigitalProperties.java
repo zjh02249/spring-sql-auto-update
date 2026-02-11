@@ -41,9 +41,21 @@ public class FlywayDigitalProperties {
     private boolean validateOnMigrate = true;
 
     /**
-     * 是否允许无序迁移
+     * 是否允许无序迁移（out of order）
      */
     private boolean outOfOrder = false;
+
+    /**
+     * 动态数据源场景下，指定要使用的实际数据源 bean 名称
+     * 如果不指定，将自动尝试查找 "masterDataSource"、"dataSource" 或第一个可用的数据源
+     */
+    private String dynamicDatasourceBeanName;
+
+    /**
+     * 是否启用调试模式
+     * 启用后会输出详细的自动配置加载诊断信息
+     */
+    private boolean debug = false;
 
     public boolean isEnabled() {
         return enabled;
@@ -101,6 +113,22 @@ public class FlywayDigitalProperties {
         this.outOfOrder = outOfOrder;
     }
 
+    public String getDynamicDatasourceBeanName() {
+        return dynamicDatasourceBeanName;
+    }
+
+    public void setDynamicDatasourceBeanName(String dynamicDatasourceBeanName) {
+        this.dynamicDatasourceBeanName = dynamicDatasourceBeanName;
+    }
+
+    public boolean isDebug() {
+        return debug;
+    }
+
+    public void setDebug(boolean debug) {
+        this.debug = debug;
+    }
+
     @Override
     public String toString() {
         return "FlywayDigitalProperties{" +
@@ -111,6 +139,8 @@ public class FlywayDigitalProperties {
                 ", baselineVersion='" + baselineVersion + '\'' +
                 ", validateOnMigrate=" + validateOnMigrate +
                 ", outOfOrder=" + outOfOrder +
+                ", dynamicDatasourceBeanName='" + dynamicDatasourceBeanName + '\'' +
+                ", debug=" + debug +
                 '}';
     }
 }
