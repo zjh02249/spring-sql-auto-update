@@ -295,6 +295,92 @@ CREATE TABLE flyway_digital_history (
 
 ---
 
+## 🔄 事务管理
+
+### 自动事务管理
+
+框架为每个SQL迁移脚本自动管理事务，确保数据一致性：
+
+| 阶段 | 行为 | 说明 |
+|------|------|------|
+| **开始前** | `setAutoCommit(false)` | 关闭自动提交，开启新事务 |
+| **执行中** | 执行SQL语句 | 所有SQL在同一事务中 |
+| **成功时** | `commit()` | 提交事务，所有变更生效 |
+| **失败时** | `rollback()` | 回滚事务，撤销所有变更 |
+| **结束后** | `setAutoCommit(original)` | 恢复原始自动提交设置 |
+
+### 禁止手动事务控制
+
+⚠️ **警告：不要在SQL脚本中使用以下事务控制语句：**
+
+```sql
+-- 禁止使用的语句
+BEGIN TRANSACTION;  -- 或 START TRANSACTION
+COMMIT;
+ROLLBACK;
+SAVEPOINT xxx;
+RELEASE SAVEPOINT xxx;
+```
+
+**使用这些语句会导致：**
+
+1. **不可预测的事务行为** - 手动提交/回滚会干扰框架的事务管理
+2. **数据不一致** - 部分SQL可能意外提交，导致回滚失败
+3. **嵌套事务错误** - 大多数数据库和JDBC驱动不支持真正的嵌套事务
+4. **难以调试** - 事务状态混乱导致错误难以定位
+
+### 事务管理最佳实践
+
+✅ **正确的SQL脚本示例：**
+
+```sql
+-- V1.0.0__create_user_table.sql
+-- 正确：只包含DDL/DML，不包含事务控制语句
+
+CREATE TABLE users (
+    id BIGINT PRIMARY KEY AUTO_INCREMENT,
+    username VARCHAR(50) NOT NULL COMMENT '用户名',
+    email VARCHAR(100) COMMENT '邮箱',
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间'
+) COMMENT='用户表';
+
+CREATE INDEX idx_username ON users(username);
+```
+
+❌ **错误的SQL脚本示例：**
+
+```sql
+-- V1.0.0__create_user_table.sql
+-- 错误：包含事务控制语句
+
+BEGIN TRANSACTION;  -- ❌ 不要这样做！
+
+CREATE TABLE users (
+    id BIGINT PRIMARY KEY AUTO_INCREMENT,
+    username VARCHAR(50) NOT NULL
+);
+
+COMMIT;  -- ❌ 不要这样做！
+```
+
+### 何时需要考虑手动事务？
+
+**通常情况下，你不需要考虑事务。** 框架已经为你处理了。
+
+只有在以下特殊情况下，你可能需要手动控制：
+
+1. **部分提交场景** - 希望某些DDL立即生效（不常见）
+2. **批量操作优化** - 超大脚本需要分批提交（建议拆分成多个脚本）
+3. **特定数据库行为** - 某些数据库对事务中的DDL有特殊处理
+
+**如果确实需要手动事务控制，建议：**
+- 与数据库管理员或架构师讨论
+- 充分测试回滚场景
+- 在文档中明确记录原因
+- 考虑是否有更好的替代方案（如拆分脚本）
+
+---
+
 ## 💡 最佳实践
 
 ### 1. SQL 文件组织
