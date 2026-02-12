@@ -90,128 +90,33 @@ public class SqlExecutor {
     }
 
     /**
-     * 智能分割 SQL 语句
-     * 
-     * 特性：
-     * 1. 正确处理字符串中的分号（如 'a;b;c'）
-     * 2. 正确处理注释中的分号
-     * 3. 保持原始语句格式
+     * 执行SQL内容
      */
-    private String[] splitSqlStatements(String sqlContent) {
-        java.util.List<String> statements = new java.util.ArrayList<>();
-        StringBuilder currentStatement = new StringBuilder();
-        
-        boolean inSingleQuote = false;
-        boolean inDoubleQuote = false;
-        boolean inLineComment = false;
-        boolean inBlockComment = false;
-        
-        int len = sqlContent.length();
-        
-        for (int i = 0; i < len; i++) {
-            char c = sqlContent.charAt(i);
-            char nextChar = (i < len - 1) ? sqlContent.charAt(i + 1) : '\0';
+    private void executeSql(Connection connection, String sqlContent, String scriptName) throws SQLException {
+        // 使用智能分割算法处理SQL语句
+        String[] statements = splitSqlStatements(sqlContent)
+        int statementCount = 0
+ 
+        for (String statement : statements):
+            String trimmedStatement = statement.trim()
+            if (trimmedStatement.isEmpty()):
+                continue
+ 
+            statementCount++
             
-            // 处理块注释 /* */
-            if (!inLineComment && !inSingleQuote && !inDoubleQuote) {
-                if (!inBlockComment && c == '/' && nextChar == '*') {
-                    inBlockComment = true;
-                    currentStatement.append(c);
-                    currentStatement.append(nextChar);
-                    i++; // 跳过下一个字符
-                    continue;
-                }
-                if (inBlockComment && c == '*' && nextChar == '/') {
-                    inBlockComment = false;
-                    currentStatement.append(c);
-                    currentStatement.append(nextChar);
-                    i++; // 跳过下一个字符
-                    continue;
-                }
-            }
-            
-            // 处理行注释 --
-            if (!inBlockComment && !inSingleQuote && !inDoubleQuote) {
-                if (!inLineComment && c == '-' && nextChar == '-') {
-                    inLineComment = true;
-                    currentStatement.append(c);
-                    currentStatement.append(nextChar);
-                    i++; // 跳过下一个字符
-                    continue;
-                }
-                if (inLineComment && c == '\n') {
-                    inLineComment = false;
-                }
-            }
-            
-            // 处理单引号字符串
-            if (!inLineComment && !inBlockComment && !inDoubleQuote) {
-                if (c == '\'' && (i == 0 || sqlContent.charAt(i - 1) != '\\')) {
-                    inSingleQuote = !inSingleQuote;
-                }
-            }
-            
-            // 处理双引号字符串
-            if (!inLineComment && !inBlockComment && !inSingleQuote) {
-                if (c == '"' && (i == 0 || sqlContent.charAt(i - 1) != '\\')) {
-                    inDoubleQuote = !inDoubleQuote;
-                }
-            }
-            
-            // 处理语句分割（分号）
-            if (c == ';' && !inSingleQuote && !inDoubleQuote && !inLineComment && !inBlockComment) {
-                String statement = currentStatement.toString().trim();
-                if (!statement.isEmpty()) {
-                    statements.add(statement);
-                }
-                currentStatement = new StringBuilder();
-                continue;
-            }
-            
-            currentStatement.append(c);
-        }
-        
-        // 处理最后一条语句（可能没有分号结尾）
-        String lastStatement = currentStatement.toString().trim();
-        if (!lastStatement.isEmpty()) {
-            statements.add(lastStatement);
-        }
-        
-        return statements.toArray(new String[0]);
-    }
-
-    /**
-     * 智能分割 SQL 语句
-     * 
-     * 特性：
-     * 1. 正确处理字符串中的分号（如 'a;b;c'）
-     * 2. 正确处理注释中的分号
-     * 3. 保持原始语句格式
-     */
-    private String[] splitSqlStatements(String sqlContent) {
-        java.util.List<String> statements = new java.util.ArrayList<>();
-        StringBuilder currentStatement = new StringBuilder();
-        
-        boolean inSingleQuote = false;
-        boolean inDoubleQuote = false;
-        boolean inLineComment = false;
-        boolean inBlockComment = false;
-        
-        int len = sqlContent.length();
-        
-        for (int i = 0; i < len; i++) {
-            char c = sqlContent.charAt(i);
-            char nextChar = (i < len - 1) ? sqlContent.charAt(i + 1) : '\0';
-            
-            // 处理块注释 /* */
-            if (!inLineComment && !inSingleQuote && !inDoubleQuote) {
-                if (!inBlockComment && c == '/' && nextChar == '*') {
-                    inBlockComment = true;
-                    currentStatement.append(c);
-                    currentStatement.append(nextChar);
-                    i++; // 跳过下一个字符
-                    continue;
-                }
+            try (Statement stmt = connection.createStatement()):
+                LOGGER.debug("[SqlExecutor] [PATH:{}] Executing statement #{}: {}",
+                        scriptName, statementCount, 
+                        trimmedStatement.substring(0, Math.min(100, trimmedStatement.length()))
+                
+                stmt.execute(trimmedStatement)
+            } catch (SQLException e):
+                LOGGER.error("[SqlExecutor] [PATH:{}] Statement #{} failed: {}",
+                        scriptName, statementCount, trimmedStatement)
+                throw e
+ 
+        LOGGER.info("[SqlExecutor] [PATH:{}] Executed {} SQL statement(s)", 
+                scriptName, statementCount)
                 if (inBlockComment && c == '*' && nextChar == '/') {
                     inBlockComment = false;
                     currentStatement.append(c);
