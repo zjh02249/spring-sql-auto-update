@@ -1,20 +1,22 @@
 package com.cbkj.infrastructure.executor;
 
 import org.junit.Test;
+import javax.sql.DataSource;
+
 import static org.junit.Assert.*;
 
 /**
  * SqlExecutor 测试类
- * 
+ *
  * 专门测试 SQL 语句分割逻辑，特别是修复字符串中包含分号的 BUG。
- * 
+ *
  * 关键测试场景：
  * 1. 字符串中包含分号（如 'a;b;c'）
  * 2. 注释中包含分号
  * 3. 多行字符串
  * 4. 多条语句
  * 5. 原始问题中的复杂 SQL
- * 
+ *
  * @author cbkj
  * @since 1.2.2
  */
@@ -24,9 +26,14 @@ public class SqlExecutorTest {
      * 测试工具方法：通过反射调用私有的 splitSqlStatements 方法
      */
     private String[] splitSqlStatements(String sqlContent) throws Exception {
+        // 创建 H2 内存数据库 DataSource
+        org.h2.jdbcx.JdbcDataSource ds = new org.h2.jdbcx.JdbcDataSource();
+        ds.setURL("jdbc:h2:mem:test;");
+        SqlExecutor executor = new SqlExecutor(ds);
+        
         java.lang.reflect.Method method = SqlExecutor.class.getDeclaredMethod("splitSqlStatements", String.class);
         method.setAccessible(true);
-        return (String[]) method.invoke(null, sqlContent);
+        return (String[]) method.invoke(executor, sqlContent);
     }
 
     // ==================== 基础测试用例 ====================
