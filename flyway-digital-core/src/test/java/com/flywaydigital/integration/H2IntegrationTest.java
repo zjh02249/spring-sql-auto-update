@@ -119,7 +119,7 @@ public class H2IntegrationTest {
         // Modify a checksum in the history table to simulate changed SQL
         try (Connection conn = dataSource.getConnection();
              Statement stmt = conn.createStatement()) {
-            stmt.execute("UPDATE flyway_digital_history SET checksum = checksum + 1 WHERE version = '1.0.0'");
+            stmt.execute("UPDATE flyway_digital_history SET checksum = checksum + 1 WHERE version = '1'");
         }
 
         // Second migration should fail due to checksum mismatch

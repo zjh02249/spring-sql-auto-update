@@ -7,7 +7,6 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.io.*;
-import java.net.URL;
 import java.nio.charset.StandardCharsets;
 import java.util.*;
 import java.util.regex.Matcher;
@@ -16,6 +15,7 @@ import java.util.regex.Pattern;
 /**
  * SQL文件扫描器
  * 负责扫描指定位置的SQL迁移文件
+ * 构建期生成 migration.index 文件，运行期只读取该索引文件，不再扫描目录或 jar
  */
 public class SqlScanner {
 
@@ -83,7 +83,7 @@ public class SqlScanner {
             if (path.startsWith("/")) {
                 path = path.substring(1);
             }
-            migrations.addAll(scanClasspath(path));
+            migrations.addAll(loadFromIndex(path));
         } else {
             // 文件系统路径
             migrations.addAll(scanFileSystem(location));
@@ -93,9 +93,54 @@ public class SqlScanner {
     }
 
     /**
-     * 扫描类路径
+     * 从 migration.index 文件加载 SQL 文件列表
+     * 构建期已生成该文件，运行期只读取索引，不再扫描目录或 jar
+     * 如果 index 文件不存在，降级到传统扫描模式（用于开发和测试环境）
      */
-    private List<SqlMigration> scanClasspath(String path) {
+    private List<SqlMigration> loadFromIndex(String path) {
+        List<SqlMigration> migrations = new ArrayList<>();
+        ClassLoader classLoader = Thread.currentThread().getContextClassLoader();
+        if (classLoader == null) {
+            classLoader = SqlScanner.class.getClassLoader();
+        }
+
+        String indexPath = path + "/migration.index";
+        InputStream indexStream = classLoader.getResourceAsStream(indexPath);
+        if (indexStream == null) {
+            LOGGER.warn("[SQLScanner] Migration index not found: {}, falling back to traditional scanning", indexPath);
+            return scanClasspathFallback(path);
+        }
+
+        try (BufferedReader reader = new BufferedReader(new InputStreamReader(indexStream, StandardCharsets.UTF_8))) {
+            String fileName;
+            while ((fileName = reader.readLine()) != null) {
+                fileName = fileName.trim();
+                if (fileName.isEmpty()) {
+                    continue;
+                }
+
+                InputStream sqlStream = classLoader.getResourceAsStream(path + "/" + fileName);
+                if (sqlStream == null) {
+                    throw new IllegalStateException("Missing SQL file: " + fileName);
+                }
+
+                String sqlContent = readInputStream(sqlStream);
+                SqlMigration migration = parseMigrationFile(fileName, "classpath:" + path, () -> sqlContent);
+                if (migration != null) {
+                    migrations.add(migration);
+                }
+            }
+        } catch (IOException e) {
+            throw new RuntimeException("Failed to load migration index: " + indexPath, e);
+        }
+
+        return migrations;
+    }
+
+    /**
+     * 传统的 classpath 扫描模式（用于开发和测试环境的 fallback）
+     */
+    private List<SqlMigration> scanClasspathFallback(String path) {
         List<SqlMigration> migrations = new ArrayList<>();
         
         try {
@@ -127,6 +172,117 @@ public class SqlScanner {
         }
         
         return migrations;
+    }
+
+    /**
+     * 扫描文件系统路径（用于开发环境）
+     */
+    private List<SqlMigration> scanFileSystem(String path) {
+        File directory = new File(path);
+        if (!directory.exists()) {
+            LOGGER.warn("[SQLScanner] Directory does not exist: {}", path);
+            return new ArrayList<>();
+        }
+        if (!directory.isDirectory()) {
+            LOGGER.warn("[SQLScanner] Path is not a directory: {}", path);
+            return new ArrayList<>();
+        }
+        return scanDirectory(directory, path);
+    }
+
+    /**
+     * 递归扫描目录（用于开发环境）
+     */
+    private List<SqlMigration> scanDirectory(File directory, String basePath) {
+        List<SqlMigration> migrations = new ArrayList<>();
+
+        File[] files = directory.listFiles();
+        if (files == null) {
+            return migrations;
+        }
+
+        for (File file : files) {
+            if (file.isDirectory()) {
+                // 递归扫描子目录
+                migrations.addAll(scanDirectory(file, basePath));
+            } else if (file.getName().endsWith(".sql")) {
+                SqlMigration migration = parseMigrationFile(file, basePath);
+                if (migration != null) {
+                    migrations.add(migration);
+                }
+            }
+        }
+
+        return migrations;
+    }
+
+    /**
+     * 解析迁移文件
+     */
+    private SqlMigration parseMigrationFile(File file, String basePath) {
+        String fileName = file.getName();
+        
+        // 使用ContentProvider读取文件内容
+        return parseMigrationFile(fileName, basePath, () -> {
+            try (FileInputStream fis = new FileInputStream(file)) {
+                return readInputStream(fis);
+            }
+        });
+    }
+
+    /**
+     * 解析迁移文件（通用）
+     */
+    private SqlMigration parseMigrationFile(String fileName, String location, ContentProvider contentProvider) {
+        Matcher matcher = MIGRATION_PATTERN.matcher(fileName);
+        if (!matcher.matches()) {
+            LOGGER.debug("[SQLScanner] File does not match migration pattern, skipping: {}", fileName);
+            return null;
+        }
+
+        String versionStr = matcher.group(1);
+        String description = matcher.group(2).replace("_", " ");
+
+        try {
+            MigrationVersion version = MigrationVersion.parse(versionStr);
+            String sqlContent = contentProvider.getContent();
+            int checksum = ChecksumCalculator.calculate(sqlContent);
+
+            LOGGER.info("[SQLScanner] Found migration: version={}, script={}", version, fileName);
+            
+            return new SqlMigration(version, description, fileName, sqlContent, checksum, location);
+        } catch (Exception e) {
+            LOGGER.error("[SQLScanner] Error parsing migration file: {}", fileName, e);
+            return null;
+        }
+    }
+
+    /**
+     * 读取输入流内容为字符串
+     */
+    private String readInputStream(InputStream inputStream) throws IOException {
+        StringBuilder sb = new StringBuilder();
+        try (BufferedReader reader = new BufferedReader(
+                new InputStreamReader(inputStream, StandardCharsets.UTF_8))) {
+            String line;
+            while ((line = reader.readLine()) != null) {
+                sb.append(line).append("\n");
+            }
+        }
+        return sb.toString();
+    }
+
+    /**
+     * 检查版本号重复
+     */
+    private void checkForDuplicateVersions(List<SqlMigration> migrations) {
+        java.util.Set<MigrationVersion> versions = new java.util.HashSet<>();
+        for (SqlMigration migration : migrations) {
+            if (!versions.add(migration.getVersion())) {
+                throw new IllegalStateException(
+                        "[SQLScanner] Found duplicate migration version: " + migration.getVersion());
+            }
+        }
     }
 
     /**
@@ -318,117 +474,6 @@ public class SqlScanner {
         }
         
         return migrations;
-    }
-
-    /**
-     * 扫描文件系统路径
-     */
-    private List<SqlMigration> scanFileSystem(String path) {
-        File directory = new File(path);
-        if (!directory.exists()) {
-            LOGGER.warn("[SQLScanner] Directory does not exist: {}", path);
-            return new ArrayList<>();
-        }
-        if (!directory.isDirectory()) {
-            LOGGER.warn("[SQLScanner] Path is not a directory: {}", path);
-            return new ArrayList<>();
-        }
-        return scanDirectory(directory, path);
-    }
-
-    /**
-     * 递归扫描目录
-     */
-    private List<SqlMigration> scanDirectory(File directory, String basePath) {
-        List<SqlMigration> migrations = new ArrayList<>();
-
-        File[] files = directory.listFiles();
-        if (files == null) {
-            return migrations;
-        }
-
-        for (File file : files) {
-            if (file.isDirectory()) {
-                // 递归扫描子目录
-                migrations.addAll(scanDirectory(file, basePath));
-            } else if (file.getName().endsWith(".sql")) {
-                SqlMigration migration = parseMigrationFile(file, basePath);
-                if (migration != null) {
-                    migrations.add(migration);
-                }
-            }
-        }
-
-        return migrations;
-    }
-
-    /**
-     * 解析迁移文件
-     */
-    private SqlMigration parseMigrationFile(File file, String basePath) {
-        String fileName = file.getName();
-        
-        // 使用ContentProvider读取文件内容
-        return parseMigrationFile(fileName, basePath, () -> {
-            try (FileInputStream fis = new FileInputStream(file)) {
-                return readInputStream(fis);
-            }
-        });
-    }
-
-    /**
-     * 解析迁移文件（通用）
-     */
-    private SqlMigration parseMigrationFile(String fileName, String location, ContentProvider contentProvider) {
-        Matcher matcher = MIGRATION_PATTERN.matcher(fileName);
-        if (!matcher.matches()) {
-            LOGGER.debug("[SQLScanner] File does not match migration pattern, skipping: {}", fileName);
-            return null;
-        }
-
-        String versionStr = matcher.group(1);
-        String description = matcher.group(2).replace("_", " ");
-
-        try {
-            MigrationVersion version = MigrationVersion.parse(versionStr);
-            String sqlContent = contentProvider.getContent();
-            int checksum = ChecksumCalculator.calculate(sqlContent);
-
-            LOGGER.info("[SQLScanner] Found migration: version={}, script={}", version, fileName);
-            
-            return new SqlMigration(version, description, fileName, sqlContent, checksum, location);
-        } catch (Exception e) {
-            LOGGER.error("[SQLScanner] Error parsing migration file: {}", fileName, e);
-            return null;
-        }
-    }
-
-    /**
-     * 读取输入流内容为字符串
-     */
-    private String readInputStream(InputStream inputStream) throws IOException {
-        StringBuilder sb = new StringBuilder();
-        try (BufferedReader reader = new BufferedReader(
-                new InputStreamReader(inputStream, StandardCharsets.UTF_8))) {
-            String line;
-            while ((line = reader.readLine()) != null) {
-                sb.append(line).append("\n");
-            }
-        }
-        return sb.toString();
-    }
-
-    /**
-     * 检查版本号重复
-     */
-    private void checkForDuplicateVersions(List<SqlMigration> migrations) {
-        java.util.Set<MigrationVersion> versions = new java.util.HashSet<>();
-        for (SqlMigration migration : migrations) {
-            if (!versions.add(migration.getVersion())) {
-                throw new IllegalStateException(
-                        "[SQLScanner] Found duplicate migration version: " + migration.getVersion());
-            }
-        }
     }
 
     /**

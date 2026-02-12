@@ -24,25 +24,28 @@
 
 ```
 flyway-digital/
-├── flyway-digital-core/           # 核心迁移引擎 [发布到 Maven]
-│   ├── src/main/java/com/cbkj/infrastructure/
-│   │   ├── core/FlywayDigital.java              # 主入口类
-│   │   ├── core/config/FlywayDigitalConfig.java # 配置类
-│   │   ├── executor/SqlExecutor.java            # SQL 执行器
-│   │   ├── scanner/SqlScanner.java              # SQL 文件扫描
-│   │   ├── history/HistoryRepository.java       # 迁移历史操作
-│   │   ├── history/HistoryTableManager.java     # History 表管理
-│   │   └── model/                               # 领域模型
-│   └── src/test/java/                           # 集成测试
-├── flyway-digital-spring-boot-starter/  # Spring Boot Starter [发布到 Maven]
-│   ├── FlywayDigitalAutoConfiguration.java      # 自动配置类
-│   ├── FlywayDigitalProperties.java             # 配置属性
-│   └── META-INF/spring/
-│       ├── spring.factories                     # Spring Boot 2.x
-│       └── org.springframework.boot.autoconfigure.AutoConfiguration.imports  # Spring Boot 3.x
-└── flyway-digital-samples/        # 示例模块 [不发布]
-    ├── spring-boot-sample/                        # Spring Boot 示例
-    └── standalone-sample/                         # 独立使用示例
+├── flyway-digital-core/                              # 核心迁移引擎 [发布到 Maven]
+│   └── src/main/java/com/flywaydigital/
+│       ├── core/FlywayDigital.java                  # 主入口类
+│       ├── core/config/FlywayDigitalConfig.java     # 配置类
+│       ├── executor/SqlExecutor.java                # SQL 执行器
+│       ├── scanner/SqlScanner.java                  # SQL 文件扫描
+│       ├── history/HistoryRepository.java           # 迁移历史操作
+│       ├── history/HistoryTableManager.java         # History 表管理
+│       ├── model/                                    # 领域模型
+│       │   ├── MigrationVersion.java                # 版号解析
+│       │   ├── SqlMigration.java                    # 迁移模型
+│       │   └── AppliedMigration.java                # 已应用迁移
+│       └── util/                                     # 工具类
+│           ├── ChecksumCalculator.java               # CRC32 校验
+│           └── VersionComparator.java               # 版本比较器
+├── flyway-digital-spring-boot-starter/               # Spring Boot Starter [发布到 Maven]
+│   └── src/main/java/com/flywaydigital/autoconfigure/
+│       ├── FlywayDigitalAutoConfiguration.java      # 自动配置类
+│       └── FlywayDigitalProperties.java             # 配置属性
+├── flyway-digital-samples/                            # 示例模块 [不发布]
+│   ├── spring-boot-sample/                           # Spring Boot 示例
+│   └── standalone-sample/                            # 独立使用示例
 ```
 
 ---
@@ -51,13 +54,13 @@ flyway-digital/
 
 | Task | Location | Notes |
 |------|----------|-------|
-| **核心迁移逻辑** | `flyway-digital-core/src/main/java/com/cbkj/infrastructure/core/FlywayDigital.java` | 主入口类，协调整个迁移流程 |
-| **自动配置** | `flyway-digital-spring-boot-starter/src/main/java/com/cbkj/infrastructure/autoconfigure/FlywayDigitalAutoConfiguration.java` | Spring Boot 自动配置 |
+| **核心迁移逻辑** | `flyway-digital-core/src/main/java/com/flywaydigital/core/FlywayDigital.java` | 主入口类，协调整个迁移流程 |
+| **自动配置** | `flyway-digital-spring-boot-starter/src/main/java/com/flywaydigital/autoconfigure/FlywayDigitalAutoConfiguration.java` | Spring Boot 自动配置 |
 | **动态数据源支持** | `FlywayDigitalAutoConfiguration.java#determineDataSource()` | 智能数据源查找逻辑 |
-| **SQL 执行** | `flyway-digital-core/src/main/java/com/cbkj/infrastructure/executor/SqlExecutor.java` | 事务管理，分号分割 SQL |
-| **版本解析** | `flyway-digital-core/src/main/java/com/cbkj/infrastructure/model/MigrationVersion.java` | 语义版本解析和比较 |
-| **历史记录** | `flyway-digital-core/src/main/java/com/cbkj/infrastructure/history/` | History 表 CRUD 操作 |
-| **集成测试** | `flyway-digital-core/src/test/java/com/cbkj/infrastructure/integration/` | H2 内存数据库测试 |
+| **SQL 执行** | `flyway-digital-core/src/main/java/com/flywaydigital/executor/SqlExecutor.java` | 事务管理，分号分割 SQL |
+| **版本解析** | `flyway-digital-core/src/main/java/com/flywaydigital/model/MigrationVersion.java` | 语义版本解析和比较 |
+| **历史记录** | `flyway-digital-core/src/main/java/com/flywaydigital/history/` | History 表 CRUD 操作 |
+| **集成测试** | `flyway-digital-core/src/test/java/com/flywaydigital/integration/` | H2 内存数据库测试 |
 | **发布规范** | `BUILD_AND_DEPLOY.md` | 构建和发布流程文档 |
 | **动态数据源指南** | `DYNAMIC_DATASOURCE_GUIDE.md` | Spring Boot 3.x + 动态数据源配置 |
 | **开发者文档** | `README-DEV.md` | 详细使用文档 |
@@ -83,7 +86,7 @@ flyway-digital/
 ## CONVENTIONS
 
 ### 代码规范
-- **包名**: `com.cbkj.infrastructure` (已统一，旧代码可能有 `com.flywaydigital`)
+- **包名**: `com.flywaydigital` (核心模块)
 - **类命名**: PascalCase，描述性名称
 - **日志格式**: `[ClassName] 消息`，如 `[FlywayDigital] Starting migration...`
 - **注释**: 中文注释为主，关键配置类有详细 Javadoc

@@ -43,4 +43,41 @@
         </dependency>
     </dependencies>
 
+    <build>
+        <plugins>
+            <plugin>
+                <groupId>org.apache.maven.plugins</groupId>
+                <artifactId>maven-antrun-plugin</artifactId>
+                <version>3.1.0</version>
+                <executions>
+                    <execution>
+                        <phase>process-resources</phase>
+                        <configuration>
+                            <target>
+                                <!-- 清理已存在的 migration.index -->
+                                <delete file="${project.build.outputDirectory}/db/migration/migration.index" failonerror="false"/>
+                                <!-- 创建目标目录 -->
+                                <mkdir dir="${project.build.outputDirectory}/db/migration"/>
+                                <!-- 扫描 SQL 文件并生成索引 -->
+                                <pathconvert property="migration.files" pathsep="&#10;">
+                                    <fileset dir="${project.basedir}/src/main/resources/db/migration">
+                                        <include name="V*.sql"/>
+                                    </fileset>
+                                    <mapper type="flatten"/>
+                                </pathconvert>
+                                <!-- 写入 migration.index -->
+                                <echo file="${project.build.outputDirectory}/db/migration/migration.index">${migration.files}</echo>
+                                <!-- 输出调试信息 -->
+                                <echo message="Generated migration.index with files: ${migration.files}"/>
+                            </target>
+                        </configuration>
+                        <goals>
+                            <goal>run</goal>
+                        </goals>
+                    </execution>
+                </executions>
+            </plugin>
+        </plugins>
+    </build>
+
 </project>
