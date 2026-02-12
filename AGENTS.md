@@ -1,7 +1,7 @@
 # Flyway Digital - AGENTS.md
 
-**Generated**: 2025-02-11  
-**Version**: 1.2.1  
+**Generated**: 2025-02-12  
+**Version**: 1.2.6  
 **Project Type**: Java Maven Multi-Module  
 **Language**: Java 8+  
 **Framework**: Spring Boot 2.x/3.x
@@ -176,7 +176,7 @@ mvn clean deploy -DskipTests
 ### 版本更新
 ```bash
 # 批量更新所有 pom.xml 版本号
-sed -i 's/<version>1.2.1<\/version>/<version>1.2.2<\/version>/g' \
+sed -i 's/<version>1.2.5<\/version>/<version>1.2.6<\/version>/g' \
     pom.xml \
     flyway-digital-core/pom.xml \
     flyway-digital-spring-boot-starter/pom.xml \
@@ -215,6 +215,6 @@ flyway-digital:
 
 ---
 
-**Last Updated**: 2025-02-11  
+**Last Updated**: 2025-02-12  
 **Maintainer**: cbkj  
 **License**: Apache License 2.0
