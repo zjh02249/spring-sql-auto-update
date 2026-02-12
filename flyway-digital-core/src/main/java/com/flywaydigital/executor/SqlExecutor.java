@@ -90,33 +90,34 @@ public class SqlExecutor {
     }
 
     /**
-     * 执行SQL内容
+     * 智能分割SQL语句
+     * 能够正确处理：
+     * - 字符串中的分号（单引号、双引号）
+     * - 注释中的分号（-- 和 /* * /）
+     * - 复杂SQL（CREATE PROCEDURE、CREATE FUNCTION等）
      */
-    private void executeSql(Connection connection, String sqlContent, String scriptName) throws SQLException {
-        // 使用智能分割算法处理SQL语句
-        String[] statements = splitSqlStatements(sqlContent)
-        int statementCount = 0
- 
-        for (String statement : statements):
-            String trimmedStatement = statement.trim()
-            if (trimmedStatement.isEmpty()):
-                continue
- 
-            statementCount++
+    private String[] splitSqlStatements(String sqlContent) {
+        java.util.List<String> statements = new java.util.ArrayList<>();
+        StringBuilder currentStatement = new StringBuilder();
+        
+        boolean inSingleQuote = false;
+        boolean inDoubleQuote = false;
+        boolean inLineComment = false;
+        boolean inBlockComment = false;
+        
+        for (int i = 0; i < sqlContent.length(); i++) {
+            char c = sqlContent.charAt(i);
+            char nextChar = (i + 1 < sqlContent.length()) ? sqlContent.charAt(i + 1) : '\0';
             
-            try (Statement stmt = connection.createStatement()):
-                LOGGER.debug("[SqlExecutor] [PATH:{}] Executing statement #{}: {}",
-                        scriptName, statementCount, 
-                        trimmedStatement.substring(0, Math.min(100, trimmedStatement.length()))
-                
-                stmt.execute(trimmedStatement)
-            } catch (SQLException e):
-                LOGGER.error("[SqlExecutor] [PATH:{}] Statement #{} failed: {}",
-                        scriptName, statementCount, trimmedStatement)
-                throw e
- 
-        LOGGER.info("[SqlExecutor] [PATH:{}] Executed {} SQL statement(s)", 
-                scriptName, statementCount)
+            // 处理块注释 /* */
+            if (!inSingleQuote && !inDoubleQuote && !inLineComment) {
+                if (!inBlockComment && c == '/' && nextChar == '*') {
+                    inBlockComment = true;
+                    currentStatement.append(c);
+                    currentStatement.append(nextChar);
+                    i++; // 跳过下一个字符
+                    continue;
+                }
                 if (inBlockComment && c == '*' && nextChar == '/') {
                     inBlockComment = false;
                     currentStatement.append(c);
