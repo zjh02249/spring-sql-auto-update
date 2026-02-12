@@ -114,14 +114,12 @@ public class SqlScanner {
                     java.io.File file = new java.io.File(url.toURI());
                     migrations.addAll(scanDirectory(file, "classpath:" + path));
                 } else if ("jar".equals(url.getProtocol())) {
-                    String jarPath = url.getPath();
-                    if (jarPath.startsWith("file:")) {
-                        jarPath = jarPath.substring(5);
-                    }
-                    if (jarPath.contains("!")) {
-                        jarPath = jarPath.substring(0, jarPath.indexOf("!"));
-                    }
-                    migrations.addAll(scanJar(jarPath, path));
+                    // 处理标准 JAR 和 Spring Boot nested JAR
+                    String urlPath = url.getPath();
+                    handleJarUrl(urlPath, path, migrations);
+                } else {
+                    // 尝试直接作为 JAR URL 处理
+                    handleJarUrl(url.toString(), path, migrations);
                 }
             }
         } catch (Exception e) {
@@ -129,6 +127,108 @@ public class SqlScanner {
         }
         
         return migrations;
+    }
+
+    /**
+     * 处理 JAR URL（支持标准 JAR 和 Spring Boot nested JAR）
+     */
+    private void handleJarUrl(String urlPath, String entryPath, List<SqlMigration> migrations) {
+        try {
+            // Spring Boot 2.5+ nested JAR 格式: jar:nested:/path/to/app.jar/!BOOT-INF/classes!/db/migration
+            // 或: nested:/path/to/app.jar/!BOOT-INF/classes!/db/migration
+            if (urlPath.contains("nested:")) {
+                handleNestedJarUrl(urlPath, entryPath, migrations);
+            } else {
+                // 标准 JAR 格式: jar:file:/path/to/app.jar!/db/migration
+                String jarPath = urlPath;
+                if (jarPath.startsWith("file:")) {
+                    jarPath = jarPath.substring(5);
+                }
+                if (jarPath.contains("!")) {
+                    jarPath = jarPath.substring(0, jarPath.indexOf("!"));
+                }
+                migrations.addAll(scanJar(jarPath, entryPath));
+            }
+        } catch (Exception e) {
+            LOGGER.error("[SQLScanner] Error handling JAR URL: {}", urlPath, e);
+        }
+    }
+
+    /**
+     * 处理 Spring Boot nested JAR URL
+     * 格式: jar:nested:/path/to/app.jar/!BOOT-INF/classes!/db/migration
+     */
+    private void handleNestedJarUrl(String urlPath, String entryPath, List<SqlMigration> migrations) {
+        try {
+            // 解析 nested URL
+            // 格式: jar:nested:/path/app.jar/!BOOT-INF/classes!/db/migration
+            // 或: nested:/path/app.jar/!BOOT-INF/classes!/db/migration
+            
+            String remaining = urlPath;
+            
+            // 移除 jar: 前缀
+            if (remaining.startsWith("jar:")) {
+                remaining = remaining.substring(4);
+            }
+            
+            // 移除 nested: 前缀
+            if (remaining.startsWith("nested:")) {
+                remaining = remaining.substring(7);
+            }
+            
+            // 现在 remaining 是: /path/app.jar/!BOOT-INF/classes!/db/migration
+            // 找到第一个 ! 之前的是主 JAR 路径
+            int firstBang = remaining.indexOf("!");
+            if (firstBang < 0) {
+                LOGGER.warn("[SQLScanner] Invalid nested URL format: {}", urlPath);
+                return;
+            }
+            
+            // 提取主 JAR 路径
+            String mainJarPath = remaining.substring(0, firstBang);
+            
+            // 提取内部路径（BOOT-INF/classes 之后的部分）
+            String remainingPath = remaining.substring(firstBang + 1);
+            
+            // 移除开头的 /
+            if (remainingPath.startsWith("/")) {
+                remainingPath = remainingPath.substring(1);
+            }
+            
+            // 如果还有 !，说明有嵌套路径（如 BOOT-INF/classes!/db/migration）
+            String nestedJarPath = null;
+            int secondBang = remainingPath.indexOf("!");
+            if (secondBang >= 0) {
+                // 格式: BOOT-INF/classes!/db/migration
+                nestedJarPath = remainingPath.substring(0, secondBang);
+                remainingPath = remainingPath.substring(secondBang + 1);
+                if (remainingPath.startsWith("/")) {
+                    remainingPath = remainingPath.substring(1);
+                }
+            }
+            
+            LOGGER.info("[SQLScanner] Parsed nested JAR - main: {}, nested: {}, path: {}", 
+                    mainJarPath, nestedJarPath, remainingPath);
+            
+            // 构建完整的 entry path
+            String fullEntryPath = remainingPath;
+            if (entryPath != null && !entryPath.isEmpty() && !fullEntryPath.equals(entryPath)) {
+                // 确保使用正确的路径
+                fullEntryPath = entryPath;
+            }
+            
+            // 扫描主 JAR
+            if (nestedJarPath != null) {
+                // 需要扫描嵌套 JAR 内的内容
+                migrations.addAll(scanNestedJar(mainJarPath, nestedJarPath, fullEntryPath));
+            } else {
+                // 直接扫描主 JAR 内的内容
+                migrations.addAll(scanJar(mainJarPath, fullEntryPath));
+            }
+            
+        } catch (Exception e) {
+            LOGGER.error("[SQLScanner] Error handling nested JAR URL: {}", urlPath, e);
+        }
     }
 
     /**
@@ -158,6 +258,63 @@ public class SqlScanner {
             }
         } catch (Exception e) {
             LOGGER.error("[SQLScanner] Error scanning JAR: {}", jarPath, e);
+        }
+        
+        return migrations;
+    }
+
+    /**
+     * 扫描 Spring Boot 嵌套 JAR
+     * 
+     * @param mainJarPath 主 JAR 文件路径
+     * @param nestedPath 嵌套路径（如 BOOT-INF/classes）
+     * @param entryPath SQL 文件所在路径
+     */
+    private List<SqlMigration> scanNestedJar(String mainJarPath, String nestedPath, String entryPath) {
+        List<SqlMigration> migrations = new ArrayList<>();
+        
+        try (java.util.jar.JarFile jarFile = new java.util.jar.JarFile(mainJarPath)) {
+            java.util.Enumeration<java.util.jar.JarEntry> entries = jarFile.entries();
+            
+            // 构建完整的搜索路径前缀
+            String searchPrefix = nestedPath;
+            if (!searchPrefix.endsWith("/")) {
+                searchPrefix = searchPrefix + "/";
+            }
+            if (entryPath != null && !entryPath.isEmpty()) {
+                searchPrefix = searchPrefix + entryPath;
+            }
+            if (!searchPrefix.endsWith("/")) {
+                searchPrefix = searchPrefix + "/";
+            }
+            
+            LOGGER.info("[SQLScanner] Scanning nested JAR with prefix: {}", searchPrefix);
+            
+            while (entries.hasMoreElements()) {
+                java.util.jar.JarEntry entry = entries.nextElement();
+                String name = entry.getName();
+                
+                // 检查是否匹配搜索路径且是 SQL 文件
+                if (name.startsWith(searchPrefix) && name.endsWith(".sql")) {
+                    String fileName = name.substring(name.lastIndexOf("/") + 1);
+                    LOGGER.info("[SQLScanner] Found SQL file in nested JAR: {}", name);
+                    
+                    SqlMigration migration = parseMigrationFile(fileName, "classpath:" + entryPath, () -> {
+                        try (InputStream is = jarFile.getInputStream(entry)) {
+                            return readInputStream(is);
+                        }
+                    });
+                    if (migration != null) {
+                        migrations.add(migration);
+                    }
+                }
+            }
+            
+            LOGGER.info("[SQLScanner] Scanned nested JAR {}:{}, found {} migration(s)", 
+                    mainJarPath, nestedPath, migrations.size());
+                    
+        } catch (Exception e) {
+            LOGGER.error("[SQLScanner] Error scanning nested JAR: {}:{}", mainJarPath, nestedPath, e);
         }
         
         return migrations;
