@@ -1,7 +1,7 @@
 # 当前阶段压缩总结
 
-**生成时间**: 2025-02-12 12:00  
-**适用版本**: v1.2.4  
+**生成时间**: 2025-02-12 17:30
+**适用版本**: v1.2.6
 **会话状态**: ✅ 项目稳定，可继续开发
 
 ---
@@ -10,48 +10,47 @@
 
 ### 基本信息
 - **项目名称**: Flyway Digital
-- **当前版本**: 1.2.4
-- **发布状态**: ✅ 已发布到 Maven 仓库
-- **Git 状态**: ✅ 已提交推送（commit: b0c8e83）
-- **构建状态**: ✅ 编译通过
+- **当前版本**: 1.2.6
+- **发布状态**: ✅ 已提交推送到远程
+- **Git 状态**: ✅ 已提交推送（commit: e3fa59b）
+- **构建状态**: ✅ 编译通过，测试通过
 
 ### Maven 坐标
 ```xml
 <dependency>
     <groupId>com.cbkj.infrastructure</groupId>
     <artifactId>flyway-digital-spring-boot-starter</artifactId>
-    <version>1.2.4</version>
+    <version>1.2.6</version>
 </dependency>
 ```
 
 ### 仓库信息
-- **Maven 仓库**: http://maven.tcmbrain.cn/repository/maven-releases/
 - **GitHub**: https://github.com/zjh02249/spring-sql-auto-update
 - **分支**: main
 
 ---
 
-## ✅ 最近完成的工作 (v1.2.4)
+## ✅ 最近完成的工作 (v1.2.6)
 
-### 1. 修复严重编译错误
-**问题**: SqlExecutor.java 混入 Python 语法  
-**解决**: 
-- 删除重复代码
-- 修复 Java 语法
-- 添加完整的 `splitSqlStatements()` 方法（89 行状态机实现）
+### 1. 修复包路径与文件位置不匹配问题
+**问题**: 源代码文件位置与包声明不一致
 
-### 2. 补全测试文件
-**问题**: SqlExecutorTest.java 文件断开  
-**解决**: 补全 10 个完整测试用例，覆盖 SQL 分割各种场景
+**详情**:
+- 源代码声明使用 `com.cbkj.infrastructure.*`
+- 但文件实际位置在 `com/flywaydigital/` 目录下
 
-### 3. 解决版本冲突
-**问题**: 1.2.2 和 1.2.3 已存在于 Maven 仓库  
-**解决**: 升级到 1.2.4
+**解决**:
+- 移动所有源代码文件到正确目录 `com/cbkj/infrastructure/`
+- 移动所有测试文件到正确目录
+- 更新测试类的包声明
 
-### 4. 成功部署
-**结果**:
-- ✅ flyway-digital-core-1.2.4.jar (33 kB)
-- ✅ flyway-digital-spring-boot-starter-1.2.4.jar (8.3 kB)
+### 2. 修复 SqlExecutorTest 反射调用失败
+**问题**: `splitSqlStatements` 是实例方法，但测试传 `null`
+
+**解决**: 创建 SqlExecutor 实例后再调用反射方法
+
+### 3. 更新 AGENTS.md 文档
+**解决**: 更新包路径描述与实际一致
 
 ---
 
@@ -66,46 +65,17 @@
 ### 模块结构
 ```
 flyway-digital/
-├── flyway-digital-core/              # 核心模块 [发布]
-│   ├── core/                          # 迁移引擎
-│   ├── executor/SqlExecutor.java      # SQL 执行器 ⭐
-│   ├── scanner/                       # 文件扫描器
-│   ├── history/                       # 历史管理
-│   └── model/                         # 领域模型
-├── flyway-digital-spring-boot-starter/ # Spring Boot [发布]
-└── flyway-digital-samples/            # 示例 [不发布]
+ ├── flyway-digital-core/              # 核心模块
+ │   └── src/main/java/com/cbkj/infrastructure/
+ │       ├── core/                     # 迁移引擎
+ │       ├── executor/SqlExecutor.java  # SQL 执行器
+ │       ├── scanner/                  # 文件扫描器
+ │       ├── history/                  # 历史管理
+ │       └── model/                    # 领域模型
+ ├── flyway-digital-spring-boot-starter/ # Spring Boot Starter
+ │   └── src/main/java/com/flywaydigital/autoconfigure/
+ └── flyway-digital-samples/            # 示例 [不发布]
 ```
-
-### 关键实现
-
-#### SQL 分割算法（核心修复）
-使用状态机正确处理：
-- 单引号字符串 `'...'`
-- 双引号字符串 `"..."`
-- 行注释 `-- ...`
-- 块注释 `/* ... */`
-
-**位置**: `SqlExecutor.java#splitSqlStatements()`  
-**行数**: 89 行  
-**测试**: 10 个测试用例全覆盖
-
-#### History 表结构
-与 Flyway 完全兼容：
-```sql
-CREATE TABLE flyway_digital_history (
-    installed_rank INT NOT NULL PRIMARY KEY,
-    version VARCHAR(50),
-    description VARCHAR(200) NOT NULL,
-    checksum INT,  -- CRC32
-    installed_on TIMESTAMP,
-    execution_time INT,
-    success TINYINT
-);
-```
-
-#### 事务策略
-- 每个 SQL 文件 = 1 个事务
-- 成功自动提交，失败自动回滚
 
 ---
 
@@ -122,15 +92,7 @@ CREATE TABLE flyway_digital_history (
 
 ## 🐛 已知问题
 
-### 单元测试问题（低优先级）
-- **问题**: 测试通过反射调用实例方法，但 `splitSqlStatements` 不是静态方法
-- **影响**: 测试失败，但不影响功能
-- **修复**: 需要创建 SqlExecutor 实例
-
-### 集成测试失败（低优先级）
-- **问题**: baseline 功能相关测试失败
-- **影响**: 不影响核心功能
-- **修复**: 待后续完善
+**无已知问题** - 所有测试通过
 
 ---
 
@@ -138,15 +100,11 @@ CREATE TABLE flyway_digital_history (
 
 ### 必须遵守
 - ✅ Java 1.8 兼容
+- ✅ 核心模块包名: `com.cbkj.infrastructure`
+- ✅ Starter 模块包名: `com.flywaydigital.autoconfigure`
 - ✅ 仅依赖 JDBC（轻量级）
 - ✅ 不做数据库方言适配
 - ✅ 以 JAR 包形式提供
-- ✅ History 表与 Flyway 兼容
-
-### 禁止使用
-- ❌ ORM 框架（JPA, MyBatis）
-- ❌ 重型依赖
-- ❌ 数据库特定 API
 
 ---
 
@@ -172,28 +130,22 @@ git commit -m "release: vX.Y.Z"
 git push
 ```
 
-### 版本号规则
-- **补丁版本** (X.Y.Z+1): BUG 修复
-- **次版本** (X.Y+1.0): 新功能（兼容）
-- **主版本** (X+1.0.0): 破坏性变更
-
 ---
 
 ## 📝 关键文件位置
 
 ### 核心源码
-- `flyway-digital-core/src/main/java/com/flywaydigital/executor/SqlExecutor.java` - SQL 执行器
 - `flyway-digital-core/src/main/java/com/cbkj/infrastructure/core/FlywayDigital.java` - 主入口
-- `flyway-digital-spring-boot-starter/src/main/java/com/cbkj/infrastructure/autoconfigure/FlywayDigitalAutoConfiguration.java` - 自动配置
+- `flyway-digital-core/src/main/java/com/cbkj/infrastructure/executor/SqlExecutor.java` - SQL 执行器
+- `flyway-digital-spring-boot-starter/src/main/java/com/flywaydigital/autoconfigure/FlywayDigitalAutoConfiguration.java` - 自动配置
 
 ### 测试文件
-- `flyway-digital-core/src/test/java/com/cbkj/infrastructure/executor/SqlExecutorTest.java` - SQL 分割测试
 - `flyway-digital-core/src/test/java/com/cbkj/infrastructure/integration/` - 集成测试
+- `flyway-digital-core/src/test/java/com/cbkj/infrastructure/executor/SqlExecutorTest.java` - SQL 分割测试
 
 ### 文档
-- `BUILD_AND_DEPLOY.md` - 部署规范 ⭐
-- `AGENTS.md` - 项目架构地图 ⭐
-- `.ai-context.md` - AI 会话上下文
+- `BUILD_AND_DEPLOY.md` - 部署规范
+- `AGENTS.md` - 项目架构地图
 - `.ai/` - AI 持久化协作框架
 
 ---
@@ -206,15 +158,9 @@ git push
 3. 读取 `.ai/current-task.md` - 了解当前任务
 4. 读取本文档 - 快速恢复上下文
 
-### 如果修复测试
-- 位置: `SqlExecutorTest.java`
-- 问题: 反射调用需要实例
-- 方案: 创建 `new SqlExecutor(dataSource)` 实例
-
-### 如果新增功能
-- 遵循现有架构决策
-- 保持 Java 1.8 兼容
-- 参考 `decisions.md` 设计原则
+### 包路径说明
+- **核心模块**: `com.cbkj.infrastructure.*`
+- **Starter 模块**: `com.flywaydigital.autoconfigure.*`
 
 ---
 
@@ -223,7 +169,6 @@ git push
 - **部署指南**: `BUILD_AND_DEPLOY.md`
 - **项目地图**: `AGENTS.md`
 - **动态数据源指南**: `DYNAMIC_DATASOURCE_GUIDE.md`
-- **SQL 分割修复**: `SQL_SPLIT_TEST.md`
 - **开发者文档**: `README-DEV.md`
 
 ---
@@ -237,17 +182,10 @@ git push
 INSERT INTO config VALUES ('url', 'jdbc:mysql://localhost:3306;user=root');
 ```
 
-### 2. 动态数据源支持
-自动查找策略：
-```yaml
-flyway-digital:
-  dynamic-datasource-bean-name: masterDataSource  # 可配置
-```
-
-### 3. Spring Boot 双版本支持
-同时提供：
-- `META-INF/spring.factories` (2.x)
-- `META-INF/spring/...AutoConfiguration.imports` (3.x)
+### 2. 包路径清晰明确
+- 核心模块统一使用 `com.cbkj.infrastructure`
+- Starter 模块使用 `com.flywaydigital.autoconfigure`
+- 文件位置与包声明严格对应
 
 ---
 
@@ -261,5 +199,5 @@ flyway-digital:
 
 ---
 
-**状态**: ✅ 项目稳定，v1.2.4 已发布，可继续开发  
+**状态**: ✅ 项目稳定，v1.2.6 已提交推送，可继续开发
 **建议**: 下阶段可考虑完善测试和文档

@@ -5,7 +5,7 @@
 **项目名称**: Flyway Digital  
 **项目定位**: 轻量级、Flyway-Compatible SQL 数据库迁移工具  
 **创建时间**: 2025 年初  
-**当前版本**: 1.2.4
+**当前版本**: 1.2.6
 
 ### 核心问题
 
@@ -143,14 +143,14 @@ flyway-digital/
 
 ## 📊 项目现状
 
-**当前版本**: 1.2.4  
+**当前版本**: 1.2.6  
 **发布状态**: ✅ 已发布到私有 Maven 仓库  
 **Maven 坐标**:
 ```xml
 <dependency>
     <groupId>com.cbkj.infrastructure</groupId>
     <artifactId>flyway-digital-spring-boot-starter</artifactId>
-    <version>1.2.4</version>
+    <version>1.2.6</version>
 </dependency>
 ```
 

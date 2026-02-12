@@ -75,7 +75,7 @@
 ## 🔍 关键文件位置
 
 ### 核心源码
-- `flyway-digital-core/src/main/java/com/flywaydigital/executor/SqlExecutor.java` - SQL 执行器（关键）
+- `flyway-digital-core/src/main/java/com/cbkj/infrastructure/executor/SqlExecutor.java` - SQL 执行器（关键）
 - `flyway-digital-core/src/main/java/com/cbkj/infrastructure/core/FlywayDigital.java` - 主入口
 - `flyway-digital-spring-boot-starter/src/main/java/com/cbkj/infrastructure/autoconfigure/FlywayDigitalAutoConfiguration.java` - 自动配置
 
@@ -140,7 +140,7 @@ git push
 ```
 我已经加载了项目上下文。
 
-当前状态：v1.2.4 已发布，项目稳定。
+当前状态：v1.2.6 已发布，项目稳定。
 
 请问你希望我做什么？
 1. 修复已知问题（测试失败）

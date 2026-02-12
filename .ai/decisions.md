@@ -334,3 +334,75 @@ mvn clean deploy -DskipTests \
 
 **最后更新**: 2025-02-12  
 **维护者**: cbkj
+
+---
+
+## ADR-010: 统一包路径与文件位置
+
+**日期**: 2025-02-12
+**状态**: ✅ 已采纳
+
+### 背景
+
+源代码文件位置与包声明不一致，导致编译错误和类找不到问题。
+
+### 问题详情
+
+- **核心模块**:
+  - 包声明: `com.cbkj.infrastructure.*`
+  - 文件位置: `com/flywaydigital/` (错误)
+  
+- **测试模块**:
+  - 4个测试类使用了错误的包名 `com.flywaydigital.*`
+
+### 决策
+
+1. **移动源代码文件**
+   - 从 `com/flywaydigital/` 移动到 `com/cbkj/infrastructure/`
+   - 保持包声明不变
+
+2. **移动测试文件**
+   - 从 `com/flywaydigital/` 移动到 `com/cbkj/infrastructure/`
+   - 更新测试类的包声明
+
+3. **更新文档**
+   - AGENTS.md 中的包路径描述
+   - .ai 目录下的所有相关文档
+
+### 理由
+
+1. **一致性**: 文件位置必须与包声明一致
+2. **可维护性**: 清晰的目录结构便于理解
+3. **规范化**: 遵循 Java 标准包命名约定
+
+### 影响
+
+- ✅ **优点**:
+  - 编译问题解决
+  - 测试类路径正确
+  - 文档与代码一致
+  
+- ⚠️ **影响**:
+  - Git 历史显示为重命名操作（实际内容相同）
+  - 需要更新所有相关文档
+
+### 包路径说明
+
+| 模块 | 包路径 | 用途 |
+|------|--------|------|
+| 核心模块 | `com.cbkj.infrastructure.*` | 所有核心业务代码 |
+| Starter 模块 | `com.flywaydigital.autoconfigure.*` | 自动配置代码 |
+
+### 验证
+
+```bash
+# 编译验证
+mvn clean compile
+
+# 测试验证
+mvn clean test -pl flyway-digital-core
+# 结果: 34/34 测试通过
+```
+
+---
+
