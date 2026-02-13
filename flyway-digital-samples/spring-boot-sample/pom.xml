@@ -50,7 +50,7 @@
         <dependency>
             <groupId>com.cbkj.infrastructure</groupId>
             <artifactId>flyway-digital-spring-boot-starter</artifactId>
-            <version>1.2.7</version>
+<version>1.2.8</version>
         </dependency>
 
         <!-- H2 Database (for demo) -->
