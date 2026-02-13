@@ -143,14 +143,14 @@ flyway-digital/
 
 ## 📊 项目现状
 
-**当前版本**: 1.2.6  
+**当前版本**: 1.2.7
 **发布状态**: ✅ 已发布到私有 Maven 仓库  
 **Maven 坐标**:
 ```xml
 <dependency>
     <groupId>com.cbkj.infrastructure</groupId>
     <artifactId>flyway-digital-spring-boot-starter</artifactId>
-    <version>1.2.6</version>
+    <version>1.2.7</version>
 </dependency>
 ```
 

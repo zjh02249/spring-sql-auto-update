@@ -1,7 +1,7 @@
 # 当前阶段压缩总结
 
-**生成时间**: 2025-02-12 17:30
-**适用版本**: v1.2.6
+**生成时间**: 2025-02-13 09:47
+**适用版本**: v1.2.7
 **会话状态**: ✅ 项目稳定，可继续开发
 
 ---
@@ -10,9 +10,9 @@
 
 ### 基本信息
 - **项目名称**: Flyway Digital
-- **当前版本**: 1.2.6
-- **发布状态**: ✅ 已提交推送到远程
-- **Git 状态**: ✅ 已提交推送（commit: e3fa59b）
+- **当前版本**: 1.2.7
+- **发布状态**: ✅ 已发布到 Maven 仓库（2025-02-13）
+- **Git 状态**: ✅ 已提交推送（commit: 94a30f0）
 - **构建状态**: ✅ 编译通过，测试通过
 
 ### Maven 坐标
@@ -20,7 +20,7 @@
 <dependency>
     <groupId>com.cbkj.infrastructure</groupId>
     <artifactId>flyway-digital-spring-boot-starter</artifactId>
-    <version>1.2.6</version>
+    <version>1.2.7</version>
 </dependency>
 ```
 
