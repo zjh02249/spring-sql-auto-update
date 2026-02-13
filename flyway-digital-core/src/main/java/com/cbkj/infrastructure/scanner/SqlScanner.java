@@ -290,12 +290,16 @@ public class SqlScanner {
      */
     private void handleJarUrl(String urlPath, String entryPath, List<SqlMigration> migrations) {
         try {
+            // Spring Boot nested JAR 格式: jar:file:/path/to/app.jar!/BOOT-INF/classes!/db/migration
+            if (urlPath.contains("BOOT-INF/classes!")) {
+                handleBootInfNestedJarUrl(urlPath, entryPath, migrations);
+            } 
             // Spring Boot 2.5+ nested JAR 格式: jar:nested:/path/to/app.jar/!BOOT-INF/classes!/db/migration
-            // 或: nested:/path/to/app.jar/!BOOT-INF/classes!/db/migration
-            if (urlPath.contains("nested:")) {
+            else if (urlPath.contains("nested:")) {
                 handleNestedJarUrl(urlPath, entryPath, migrations);
-            } else {
-                // 标准 JAR 格式: jar:file:/path/to/app.jar!/db/migration
+            } 
+            // 标准 JAR 格式: jar:file:/path/to/app.jar!/db/migration
+            else {
                 String jarPath = urlPath;
                 if (jarPath.startsWith("file:")) {
                     jarPath = jarPath.substring(5);
@@ -307,6 +311,44 @@ public class SqlScanner {
             }
         } catch (Exception e) {
             LOGGER.error("[SQLScanner] Error handling JAR URL: {}", urlPath, e);
+        }
+    }
+
+    /**
+     * 处理 Spring Boot 嵌套 JAR URL 格式: jar:file:/path/to/app.jar!/BOOT-INF/classes!/db/migration
+     */
+    private void handleBootInfNestedJarUrl(String urlPath, String entryPath, List<SqlMigration> migrations) {
+        try {
+            // 格式: jar:file:/app/mat_search.jar!/BOOT-INF/classes!/dbUp
+            
+            LOGGER.info("[SQLScanner] Handling BOOT-INF nested JAR URL: {}", urlPath);
+            
+            // 移除 jar: 前缀
+            String remaining = urlPath;
+            if (remaining.startsWith("jar:")) {
+                remaining = remaining.substring(4);
+            }
+            
+            // 提取主 JAR 路径
+            String jarPath;
+            if (remaining.contains("!")) {
+                jarPath = remaining.substring(0, remaining.indexOf("!"));
+            } else {
+                jarPath = remaining;
+            }
+            
+            // 移除 file: 前缀
+            if (jarPath.startsWith("file:")) {
+                jarPath = jarPath.substring(5);
+            }
+            
+            LOGGER.info("[SQLScanner] Main JAR path: {}", jarPath);
+            
+            // 扫描 JAR 文件中的 BOOT-INF/classes 路径下的资源
+            migrations.addAll(scanNestedJar(jarPath, "BOOT-INF/classes", entryPath));
+            
+        } catch (Exception e) {
+            LOGGER.error("[SQLScanner] Error handling BOOT-INF nested JAR URL: {}", urlPath, e);
         }
     }
 
