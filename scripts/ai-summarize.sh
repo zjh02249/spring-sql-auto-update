@@ -85,10 +85,18 @@ AI_OUTPUT=""
 if command -v opencode &> /dev/null; then
     AI_CLI="opencode"
     echo -e "${GREEN}✓ 检测到 OpenCode CLI${NC}"
-    
-    # 调用 OpenCode
-    echo -e "${BLUE}正在调用 OpenCode 生成总结...${NC}"
-    AI_OUTPUT=$(opencode chat "${SUMMARIZE_PROMPT}")
+    echo -e "${YELLOW}⚠ OpenCode 是交互式工具${NC}"
+    echo -e "${YELLOW}请手动使用以下命令:${NC}"
+    TEMP_PROMPT_FILE="/tmp/flyway-digital-summarize-prompt.md"
+    echo "${SUMMARIZE_PROMPT}" > "${TEMP_PROMPT_FILE}"
+    echo -e "  opencode --prompt \"${TEMP_PROMPT_FILE}\""
+    echo ""
+    echo -e "${BLUE}Prompt 已保存到:${NC}"
+    echo -e "${GREEN}${TEMP_PROMPT_FILE}${NC}"
+    echo ""
+    echo -e "${YELLOW}然后将输出保存到:${NC}"
+    echo -e "  ${SUMMARY_FILE}"
+    exit 0
     
 elif command -v cursor &> /dev/null; then
     AI_CLI="cursor"

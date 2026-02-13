@@ -134,8 +134,16 @@ echo ""
 # 根据不同的 CLI 工具调用
 case "${AI_CLI}" in
     opencode)
-        # OpenCode 示例
-        opencode chat "${FINAL_PROMPT}"
+        # OpenCode 是交互式工具，提示用户手动使用
+        echo -e "${YELLOW}⚠ OpenCode 是交互式工具${NC}"
+        echo -e "${YELLOW}请手动使用以下命令:${NC}"
+        echo -e "  opencode --prompt \"${TEMP_PROMPT_FILE}\""
+        echo ""
+        echo -e "${BLUE}Prompt 已保存到:${NC}"
+        echo -e "${GREEN}${TEMP_PROMPT_FILE}${NC}"
+        echo ""
+        echo -e "${YELLOW}或者直接运行:${NC}"
+        echo -e "  opencode"
         ;;
     cursor)
         # Cursor 示例（可能需要调整）
