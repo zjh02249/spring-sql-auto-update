@@ -21,6 +21,62 @@ public class SqlExecutor {
     }
 
     /**
+     * 提取数据库名称（如果SQL语句包含库名.表名格式）
+     *
+     * @param sqlStatement SQL语句
+     * @return 数据库名称，如果不包含则返回null
+     */
+    private String extractDatabaseName(String sqlStatement) {
+        if (sqlStatement == null || sqlStatement.trim().isEmpty()) {
+            return null;
+        }
+
+        String trimmed = sqlStatement.trim().toUpperCase();
+
+        // 匹配 UPDATE 库名.表名 或 DELETE FROM 库名.表名 或 INSERT INTO 库名.表名
+        // 使用正则表达式匹配反引号或裸名
+        java.util.regex.Pattern pattern = java.util.regex.Pattern.compile(
+            "(UPDATE|FROM|INTO)\\s+[`\"]?([a-zA-Z_][a-zA-Z0-9_]*)[`\"]?\\."
+        );
+        java.util.regex.Matcher matcher = pattern.matcher(trimmed);
+
+        if (matcher.find()) {
+            String dbName = matcher.group(2);
+            LOGGER.debug("[SqlExecutor] Extracted database name '{}' from SQL: {}", dbName,
+                sqlStatement.substring(0, Math.min(50, sqlStatement.length())));
+            return dbName;
+        }
+
+        return null;
+    }
+
+    /**
+     * 切换数据库（如果可能）
+     *
+     * @param connection 数据库连接
+     * @param databaseName 目标数据库名
+     * @return 是否切换成功
+     */
+    private boolean switchDatabase(Connection connection, String databaseName) {
+        if (databaseName == null || databaseName.trim().isEmpty()) {
+            return false;
+        }
+
+        try (Statement stmt = connection.createStatement()) {
+            // 使用 USE 语句切换数据库
+            String useSql = "USE " + databaseName;
+            stmt.execute(useSql);
+            LOGGER.debug("[SqlExecutor] Successfully switched to database: {}", databaseName);
+            return true;
+        } catch (SQLException e) {
+            // 切换失败（可能是权限问题或数据库不存在），记录日志但继续执行
+            LOGGER.warn("[SqlExecutor] Failed to switch to database '{}': {}. Will try to execute SQL as-is.",
+                databaseName, e.getMessage());
+            return false;
+        }
+    }
+
+    /**
      * 在事务中执行SQL脚本
      *
      * @param sqlContent SQL脚本内容
