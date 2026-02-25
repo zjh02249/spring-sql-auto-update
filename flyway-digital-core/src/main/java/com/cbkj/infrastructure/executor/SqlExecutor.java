@@ -262,6 +262,7 @@ public class SqlExecutor {
     /**
      * 执行SQL内容
      * 在执行每条SQL语句前，会先切换回默认数据库，然后检查是否需要切换到指定数据库
+     * 执行完成后立即切换回默认数据库，确保不影响后续操作
      */
     private void executeSql(Connection connection, String sqlContent, String scriptName) throws SQLException {
         // 获取默认数据库（数据源连接的初始数据库）
@@ -289,16 +290,16 @@ public class SqlExecutor {
             // 重要：每次执行SQL前，先切换回默认数据库
             // 这样可以确保没有指定数据库名的SQL使用默认数据库
             if (!defaultDatabase.equals(currentDatabase)) {
-                LOGGER.debug("[SqlExecutor] [PATH:{}] Switching back to default database: {}",
-                        scriptName, defaultDatabase);
+                LOGGER.debug("[SqlExecutor] [PATH:{}] Switching back to default database before executing statement #{}: {}",
+                        scriptName, statementCount, defaultDatabase);
                 switchDatabase(connection, defaultDatabase);
                 currentDatabase = defaultDatabase;
             }
             
             // 如果当前SQL指定了数据库名，切换到该数据库
             if (targetDatabase != null && !targetDatabase.equals(currentDatabase)) {
-                LOGGER.debug("[SqlExecutor] [PATH:{}] Detected database switch from '{}' to '{}'",
-                        scriptName, currentDatabase, targetDatabase);
+                LOGGER.debug("[SqlExecutor] [PATH:{}] Detected database switch from '{}' to '{}' for statement #{}",
+                        scriptName, currentDatabase, targetDatabase, statementCount);
                 boolean switched = switchDatabase(connection, targetDatabase);
                 if (switched) {
                     currentDatabase = targetDatabase;
@@ -311,6 +312,15 @@ public class SqlExecutor {
                         trimmedStatement.substring(0, Math.min(100, trimmedStatement.length())));
                 
                 stmt.execute(trimmedStatement);
+                
+                // 重要：执行完成后立即切换回默认数据库
+                // 避免影响后续操作或其他组件使用连接
+                if (!defaultDatabase.equals(currentDatabase)) {
+                    LOGGER.debug("[SqlExecutor] [PATH:{}] Switching back to default database after statement #{}: {}",
+                            scriptName, statementCount, defaultDatabase);
+                    switchDatabase(connection, defaultDatabase);
+                    currentDatabase = defaultDatabase;
+                }
             } catch (SQLException e) {
                 LOGGER.error("[SqlExecutor] [PATH:{}] Statement #{} failed: {}",
                         scriptName, statementCount, trimmedStatement);

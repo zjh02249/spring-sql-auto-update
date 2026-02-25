@@ -8,7 +8,7 @@
     <parent>
         <groupId>com.cbkj.infrastructure</groupId>
         <artifactId>flyway-digital-samples</artifactId>
-        <version>1.2.9.2</version>
+        <version>1.2.9.3</version>
     </parent>
 
     <artifactId>standalone-sample</artifactId>
