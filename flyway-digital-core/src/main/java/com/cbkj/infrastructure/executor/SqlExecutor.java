@@ -31,14 +31,13 @@ public class SqlExecutor {
             return null;
         }
 
-        String trimmed = sqlStatement.trim().toUpperCase();
-
-        // 匹配 UPDATE 库名.表名 或 DELETE FROM 库名.表名 或 INSERT INTO 库名.表名
-        // 使用正则表达式匹配反引号或裸名
+        // 在原始SQL上进行匹配，保留原始大小写
+        // 使用 Pattern.CASE_INSENSITIVE 标志进行不区分大小写的匹配
         java.util.regex.Pattern pattern = java.util.regex.Pattern.compile(
-            "(UPDATE|FROM|INTO)\\s+[`\"]?([a-zA-Z_][a-zA-Z0-9_]*)[`\"]?\\."
+            "(UPDATE|FROM|INTO)\\s+[`\"]?([a-zA-Z_][a-zA-Z0-9_]*)[`\"]?\\.",
+            java.util.regex.Pattern.CASE_INSENSITIVE
         );
-        java.util.regex.Matcher matcher = pattern.matcher(trimmed);
+        java.util.regex.Matcher matcher = pattern.matcher(sqlStatement.trim());
 
         if (matcher.find()) {
             String dbName = matcher.group(2);
