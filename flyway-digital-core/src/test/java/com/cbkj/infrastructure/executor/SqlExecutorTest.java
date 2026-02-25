@@ -175,4 +175,52 @@ public class SqlExecutorTest {
         assertEquals("应去除多余空白", "SELECT * FROM users", result[0]);
         assertEquals("应去除多余空白", "INSERT INTO logs VALUES (1)", result[1]);
     }
+
+    /**
+     * 测试 11：提取SQL中的数据库名（库名.表名格式）
+     *
+     * 测试场景：
+     * - UPDATE db.table SET ...
+     * - DELETE FROM db.table WHERE ...
+     * - INSERT INTO db.table VALUES ...
+     * - 带反引号的表名：`db`.`table`
+     * - 不带库名的语句（应返回null）
+     */
+    @Test
+    public void testExtractDatabaseName() throws Exception {
+        // 使用反射访问私有方法 extractDatabaseName
+        java.lang.reflect.Method method = SqlExecutor.class.getDeclaredMethod("extractDatabaseName", String.class);
+        method.setAccessible(true);
+
+        // 创建 SqlExecutor 实例
+        org.h2.jdbcx.JdbcDataSource ds = new org.h2.jdbcx.JdbcDataSource();
+        ds.setURL("jdbc:h2:mem:testdb;DB_CLOSE_DELAY=-1");
+        SqlExecutor executor = new SqlExecutor(ds);
+
+        // 测试 UPDATE 语句
+        String sql1 = "UPDATE cbkj_web_parameter.sys_admin_menu SET menu_name = 'test' WHERE id = 1";
+        String result1 = (String) method.invoke(executor, sql1);
+        assertEquals("cbkj_web_parameter", result1);
+
+        // 测试 DELETE 语句
+        String sql2 = "DELETE FROM mydb.users WHERE id = 1";
+        String result2 = (String) method.invoke(executor, sql2);
+        assertEquals("mydb", result2);
+
+        // 测试 INSERT 语句
+        String sql3 = "INSERT INTO testdb.orders (id, name) VALUES (1, 'test')";
+        String result3 = (String) method.invoke(executor, sql3);
+        assertEquals("testdb", result3);
+
+        // 测试带反引号的表名
+        String sql4 = "UPDATE `mydb`.`table1` SET col = 1";
+        String result4 = (String) method.invoke(executor, sql4);
+        assertEquals("mydb", result4);
+
+        // 测试不带库名的语句（应返回null）
+        String sql5 = "SELECT * FROM users WHERE id = 1";
+        String result5 = (String) method.invoke(executor, sql5);
+        assertNull(result5);
+    }
+
 } 
