@@ -261,11 +261,15 @@ public class SqlExecutor {
     }
     /**
      * 执行SQL内容
-     * 在执行每条SQL语句前，会检查是否需要切换数据库
+     * 在执行每条SQL语句前，会先切换回默认数据库，然后检查是否需要切换到指定数据库
      */
     private void executeSql(Connection connection, String sqlContent, String scriptName) throws SQLException {
-        // 跟踪当前数据库，避免重复切换
-        String currentDatabase = null;
+        // 获取默认数据库（数据源连接的初始数据库）
+        String defaultDatabase = connection.getCatalog();
+        LOGGER.debug("[SqlExecutor] [PATH:{}] Default database: {}", scriptName, defaultDatabase);
+        
+        // 当前使用的数据库，初始为默认数据库
+        String currentDatabase = defaultDatabase;
         
         // 使用智能分割算法处理SQL语句
         String[] statements = splitSqlStatements(sqlContent);
@@ -282,7 +286,16 @@ public class SqlExecutor {
             // 提取数据库名（如果SQL中包含库名.表名格式）
             String targetDatabase = extractDatabaseName(trimmedStatement);
             
-            // 如果需要切换数据库
+            // 重要：每次执行SQL前，先切换回默认数据库
+            // 这样可以确保没有指定数据库名的SQL使用默认数据库
+            if (!defaultDatabase.equals(currentDatabase)) {
+                LOGGER.debug("[SqlExecutor] [PATH:{}] Switching back to default database: {}",
+                        scriptName, defaultDatabase);
+                switchDatabase(connection, defaultDatabase);
+                currentDatabase = defaultDatabase;
+            }
+            
+            // 如果当前SQL指定了数据库名，切换到该数据库
             if (targetDatabase != null && !targetDatabase.equals(currentDatabase)) {
                 LOGGER.debug("[SqlExecutor] [PATH:{}] Detected database switch from '{}' to '{}'",
                         scriptName, currentDatabase, targetDatabase);
@@ -293,8 +306,8 @@ public class SqlExecutor {
             }
             
             try (Statement stmt = connection.createStatement()) {
-                LOGGER.debug("[SqlExecutor] [PATH:{}] Executing statement #{}: {}",
-                        scriptName, statementCount, 
+                LOGGER.debug("[SqlExecutor] [PATH:{}] Executing statement #{} on database '{}': {}",
+                        scriptName, statementCount, currentDatabase,
                         trimmedStatement.substring(0, Math.min(100, trimmedStatement.length())));
                 
                 stmt.execute(trimmedStatement);
