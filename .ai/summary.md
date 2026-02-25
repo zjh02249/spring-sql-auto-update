@@ -1,8 +1,8 @@
 # 当前阶段压缩总结
 
-**生成时间**: 2026-02-25 15:00
-**适用版本**: v1.2.9
-**会话状态**: ✅ 项目稳定，v1.2.9 已完成开发，待发布
+**生成时间**: 2026-02-25 16:00
+**适用版本**: v1.2.9.1
+**会话状态**: ✅ 项目稳定，v1.2.9.1 已发布
 
 ---
 
@@ -10,10 +10,10 @@
 
 ### 基本信息
 - **项目名称**: Flyway Digital
-- **当前版本**: 1.2.9
-- **发布状态**: 🔄 待发布到 Maven 仓库
-- **Git 状态**: ✅ 已提交（3个commit）
-- **文档版本**: ✅ 已统一更新到 1.2.9
+- **当前版本**: 1.2.9.1
+- **发布状态**: ✅ 已发布到 Maven 仓库
+- **Git 状态**: ✅ 已提交
+- **文档版本**: ✅ 已统一更新到 1.2.9.1
 - **构建状态**: ✅ 编译通过，测试通过
 
 ### Maven 坐标
@@ -21,7 +21,7 @@
 <dependency>
     <groupId>com.cbkj.infrastructure</groupId>
     <artifactId>flyway-digital-spring-boot-starter</artifactId>
-    <version>1.2.9</version>
+    <version>1.2.9.1</version>
 </dependency>
 ```
 
@@ -31,27 +31,20 @@
 
 ---
 
-## ✅ 最近完成的工作 (v1.2.9)
+## ✅ 最近完成的工作 (v1.2.9.1)
 
-### 1. 修复库名.表名格式的SQL执行bug
-**问题**: SQL包含库名.表名格式时，在错误数据库中查找表
+### 修复反引号格式的库名.表名SQL执行bug
+**问题**: 正则表达式无法匹配带反引号的数据库名
 
 **详情**:
-- 错误：Table 'cbkj_web_api_digital.sys_admin_menu' doesn't exist
-- SQL语句：UPDATE cbkj_web_parameter.sys_admin_menu
-- 系统没有自动切换到正确的数据库
+- SQL语句：`UPDATE \`cbkj_web_parameter\`.\`sys_admin_menu\` SET menu_name = '候诊管理'`
+- 原正则无法匹配反引号格式
 
 **解决**:
-- 新增 extractDatabaseName(): 从SQL提取数据库名
-- 新增 switchDatabase(): 执行USE语句切换数据库
-- 修改 executeSql(): 自动检测并切换数据库
+- 改进 extractDatabaseName() 方法的正则表达式
+- 方案1：支持 `db`.table 格式（反引号包裹的数据库名）
+- 方案2：支持 db.table 格式（无引号的数据库名）
 - 支持 UPDATE、DELETE FROM、INSERT INTO 语句
-- 支持反引号格式：`db`.`table`
-- 容错处理：切换失败时继续执行
-
-### 2. 新增测试覆盖
-- 新增 testExtractDatabaseName() 测试方法
-- 验证5种场景：UPDATE、DELETE、INSERT、反引号、无库名
 - 所有56个测试用例通过
 
 ---
@@ -70,7 +63,7 @@ flyway-digital/
  ├── flyway-digital-core/              # 核心模块
  │   └── src/main/java/com/cbkj/infrastructure/
  │       ├── core/                     # 迁移引擎
- │       ├── executor/SqlExecutor.java  # SQL 执行器（新增数据库切换功能）
+ │       ├── executor/SqlExecutor.java  # SQL 执行器（改进数据库切换功能）
  │       ├── scanner/                  # 文件扫描器
  │       ├── history/                  # 历史管理
  │       └── model/                    # 领域模型
@@ -89,7 +82,7 @@ flyway-digital/
 4. **双轨制配置**: Spring Boot 2.x/3.x 同时支持
 5. **智能 SQL 分割**: 状态机算法处理复杂场景
 6. **动态数据源**: 自动查找 masterDataSource
-7. **跨数据库支持**: 新增 v1.2.9 - 自动检测并切换数据库
+7. **跨数据库支持**: 自动检测并切换数据库
 
 ---
 
@@ -116,7 +109,7 @@ flyway-digital/
 ### 标准发布命令
 ```bash
 # 1. 更新版本号
-vim pom.xml  # 修改 <version> 为 1.2.9
+vim pom.xml  # 修改 <version> 为 1.2.9.1
 
 # 2. 编译测试
 mvn clean compile
@@ -129,7 +122,7 @@ mvn clean deploy -DskipTests \
 
 # 4. 提交 Git
 git add .
-git commit -m "release: v1.2.9"
+git commit -m "release: v1.2.9.1"
 git push
 ```
 
@@ -139,12 +132,12 @@ git push
 
 ### 核心源码
 - `flyway-digital-core/src/main/java/com/cbkj/infrastructure/core/FlywayDigital.java` - 主入口
-- `flyway-digital-core/src/main/java/com/cbkj/infrastructure/executor/SqlExecutor.java` - SQL 执行器（新增数据库切换）
+- `flyway-digital-core/src/main/java/com/cbkj/infrastructure/executor/SqlExecutor.java` - SQL 执行器（改进数据库切换）
 - `flyway-digital-spring-boot-starter/src/main/java/com/flywaydigital/autoconfigure/FlywayDigitalAutoConfiguration.java` - 自动配置
 
 ### 测试文件
 - `flyway-digital-core/src/test/java/com/cbkj/infrastructure/integration/` - 集成测试
-- `flyway-digital-core/src/test/java/com/cbkj/infrastructure/executor/SqlExecutorTest.java` - SQL 测试（新增testExtractDatabaseName）
+- `flyway-digital-core/src/test/java/com/cbkj/infrastructure/executor/SqlExecutorTest.java` - SQL 测试
 
 ### 文档
 - `BUILD_AND_DEPLOY.md` - 部署规范
@@ -157,7 +150,7 @@ git push
 
 ### 如果继续开发
 1. 读取 `.ai/context.md` - 了解项目背景
-2. 读取 `.ai/decisions.md` - 了解架构决策（ADR-011已新增）
+2. 读取 `.ai/decisions.md` - 了解架构决策（ADR-012已新增）
 3. 读取 `.ai/current-task.md` - 了解当前任务（本次任务已记录）
 4. 读取本文档 - 快速恢复上下文
 
@@ -173,7 +166,7 @@ git push
 - **项目地图**: `AGENTS.md`
 - **动态数据源指南**: `DYNAMIC_DATASOURCE_GUIDE.md`
 - **开发者文档**: `README-DEV.md`
-- **架构决策**: `.ai/decisions.md` (ADR-011已新增)
+- **架构决策**: `.ai/decisions.md` (ADR-012已新增)
 
 ---
 
@@ -186,11 +179,11 @@ git push
 INSERT INTO config VALUES ('url', 'jdbc:mysql://localhost:3306;user=root');
 ```
 
-### 2. 跨数据库支持（v1.2.9新增）
+### 2. 跨数据库支持
 自动检测并切换数据库：
 ```sql
 -- 自动切换到 cbkj_web_parameter 数据库
-UPDATE cbkj_web_parameter.sys_admin_menu SET menu_name = '候诊管理';
+UPDATE `cbkj_web_parameter`.`sys_admin_menu` SET `menu_name` = '候诊管理';
 ```
 
 ### 3. 包路径清晰明确
@@ -207,9 +200,9 @@ UPDATE cbkj_web_parameter.sys_admin_menu SET menu_name = '候诊管理';
 3. **国产数据库**: 支持达梦、海量等
 4. **易集成**: Spring Boot 开箱即用
 5. **可靠性**: 事务保证 + Checksum 校验
-6. **跨数据库**: v1.2.9新增，自动检测并切换数据库
+6. **跨数据库**: v1.2.9.1 新增，支持反引号和无引号格式
 
 ---
 
-**状态**: ✅ 项目稳定，v1.2.9 已完成开发，待发布
-**建议**: 发布 v1.2.9 到 Maven 仓库
+**状态**: ✅ 项目稳定，v1.2.9.1 已发布到 Maven 仓库
+**建议**: 可继续开发新功能或完善文档

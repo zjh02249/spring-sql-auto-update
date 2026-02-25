@@ -505,3 +505,75 @@ private void executeSql(Connection connection, String sqlContent, String scriptN
 - ✅ 保持数据库名的原始大小写
 
 
+
+
+---
+
+## ADR-012: 改进库名.表名格式正则表达式匹配
+
+**日期**: 2026-02-25  
+**状态**: ✅ 已采纳
+
+### 背景
+
+用户在SQL迁移脚本中使用反引号格式的跨数据库操作，例如：
+```sql
+UPDATE `cbkj_web_parameter`.`sys_admin_menu` SET `menu_name` = '候诊管理' WHERE `menu_id` = 'digital_code_21';
+```
+
+但系统无法正确匹配这类SQL语句。
+
+### 问题分析
+
+原有的正则表达式：
+```java
+"(UPDATE|FROM|INTO)\\s+[`\"]?([a-zA-Z_][a-zA-Z0-9_]*)[`\"]?\\."
+```
+
+无法匹配以下格式：
+- `UPDATE \`db\`.\`table\` SET ...` - 反引号包裹的数据库名
+- `DELETE FROM db.table WHERE ...` - DELETE和FROM之间有空格
+- `INSERT INTO db.table VALUES ...` - INSERT和INTO之间有空格
+
+### 决策
+
+实现两种正则匹配方案：
+
+**方案1**: 匹配反引号包裹的数据库名
+```java
+"^\\s*(UPDATE|DELETE\\s+FROM|INSERT\\s+INTO)\\s+`([^`]+)`\\."
+```
+
+**方案2**: 匹配无引号的数据库名
+```java
+"^\\s*(UPDATE|DELETE\\s+FROM|INSERT\\s+INTO)\\s+([a-zA-Z_][a-zA-Z0-9_]*)\\."
+```
+
+### 理由
+
+1. **完整性**: 支持两种常见的SQL写法
+2. **兼容性**: 保持对原有无引号格式的支持
+3. **准确性**: 区分大小写关键字匹配（DELETE FROM vs FROM）
+4. **测试验证**: 56个测试全部通过
+
+### 影响
+
+- ✅ **优点**:
+  - 支持反引号格式：`db`.`table`
+  - 支持无引号格式：db.table
+  - 支持多种SQL语句类型
+  - 向后兼容
+  
+- ⚠️ **限制**:
+  - 不支持双引号格式（MySQL通常使用反引号）
+  - 不支持方括号格式（SQL Server）
+
+### 测试覆盖
+
+所有56个测试用例通过，包括：
+- ✅ UPDATE db.table SET ...
+- ✅ DELETE FROM db.table WHERE ...
+- ✅ INSERT INTO db.table VALUES ...
+- ✅ 带反引号的表名：`db`.`table`
+- ✅ 不带库名的语句（应返回null）
+- ✅ 保持数据库名的原始大小写

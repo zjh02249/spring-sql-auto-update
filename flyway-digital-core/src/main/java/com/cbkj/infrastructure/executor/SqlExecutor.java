@@ -26,23 +26,51 @@ public class SqlExecutor {
      * @param sqlStatement SQL语句
      * @return 数据库名称，如果不包含则返回null
      */
+    /**
+     * 提取数据库名称（如果SQL语句包含库名.表名格式）
+     * 支持格式：
+     * - UPDATE db.table SET ...
+     * - UPDATE `db`.`table` SET ...
+     * - UPDATE `db.table` SET ...
+     * - DELETE FROM db.table WHERE ...
+     * - INSERT INTO db.table VALUES ...
+     *
+     * @param sqlStatement SQL语句
+     * @return 数据库名称，如果不包含则返回null
+     */
     private String extractDatabaseName(String sqlStatement) {
         if (sqlStatement == null || sqlStatement.trim().isEmpty()) {
             return null;
         }
 
-        // 在原始SQL上进行匹配，保留原始大小写
-        // 使用 Pattern.CASE_INSENSITIVE 标志进行不区分大小写的匹配
-        java.util.regex.Pattern pattern = java.util.regex.Pattern.compile(
-            "(UPDATE|FROM|INTO)\\s+[`\"]?([a-zA-Z_][a-zA-Z0-9_]*)[`\"]?\\.",
+        // 去掉开头的空白，然后尝试匹配多种格式
+        String trimmedSql = sqlStatement.trim();
+
+        // 方案1: 匹配 `db`.table 或 `db`.`table` 格式（反引号包裹的数据库名）
+        // 支持 UPDATE `db`.table, DELETE FROM `db`.table, INSERT INTO `db`.table
+        java.util.regex.Pattern pattern1 = java.util.regex.Pattern.compile(
+            "^\\s*(UPDATE|DELETE\\s+FROM|INSERT\\s+INTO)\\s+`([^`]+)`\\.",
             java.util.regex.Pattern.CASE_INSENSITIVE
         );
-        java.util.regex.Matcher matcher = pattern.matcher(sqlStatement.trim());
-
-        if (matcher.find()) {
-            String dbName = matcher.group(2);
+        java.util.regex.Matcher matcher1 = pattern1.matcher(trimmedSql);
+        if (matcher1.find()) {
+            String dbName = matcher1.group(2);
             LOGGER.debug("[SqlExecutor] Extracted database name '{}' from SQL: {}", dbName,
-                sqlStatement.substring(0, Math.min(50, sqlStatement.length())));
+                trimmedSql.substring(0, Math.min(50, trimmedSql.length())));
+            return dbName;
+        }
+
+        // 方案2: 匹配 db.table 格式（无引号的数据库名）
+        // 支持 UPDATE db.table, DELETE FROM db.table, INSERT INTO db.table
+        java.util.regex.Pattern pattern2 = java.util.regex.Pattern.compile(
+            "^\\s*(UPDATE|DELETE\\s+FROM|INSERT\\s+INTO)\\s+([a-zA-Z_][a-zA-Z0-9_]*)\\.",
+            java.util.regex.Pattern.CASE_INSENSITIVE
+        );
+        java.util.regex.Matcher matcher2 = pattern2.matcher(trimmedSql);
+        if (matcher2.find()) {
+            String dbName = matcher2.group(2);
+            LOGGER.debug("[SqlExecutor] Extracted database name '{}' from SQL: {}", dbName,
+                trimmedSql.substring(0, Math.min(50, trimmedSql.length())));
             return dbName;
         }
 
@@ -231,11 +259,14 @@ public class SqlExecutor {
         
         return statements.toArray(new String[0]);
     }
-
     /**
      * 执行SQL内容
+     * 在执行每条SQL语句前，会检查是否需要切换数据库
      */
     private void executeSql(Connection connection, String sqlContent, String scriptName) throws SQLException {
+        // 跟踪当前数据库，避免重复切换
+        String currentDatabase = null;
+        
         // 使用智能分割算法处理SQL语句
         String[] statements = splitSqlStatements(sqlContent);
         int statementCount = 0;
@@ -247,6 +278,19 @@ public class SqlExecutor {
             }
 
             statementCount++;
+            
+            // 提取数据库名（如果SQL中包含库名.表名格式）
+            String targetDatabase = extractDatabaseName(trimmedStatement);
+            
+            // 如果需要切换数据库
+            if (targetDatabase != null && !targetDatabase.equals(currentDatabase)) {
+                LOGGER.debug("[SqlExecutor] [PATH:{}] Detected database switch from '{}' to '{}'",
+                        scriptName, currentDatabase, targetDatabase);
+                boolean switched = switchDatabase(connection, targetDatabase);
+                if (switched) {
+                    currentDatabase = targetDatabase;
+                }
+            }
             
             try (Statement stmt = connection.createStatement()) {
                 LOGGER.debug("[SqlExecutor] [PATH:{}] Executing statement #{}: {}",

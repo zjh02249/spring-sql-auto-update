@@ -16,7 +16,11 @@ Flyway-Digital 是一个轻量级、与 Flyway 兼容的 SQL 数据库迁移工�
 
 1. 添加依赖
 
-    <version>1.2.9</version>
+    <version>1.2.9.1</version>
+<dependency>
+    <groupId>com.cbkj.infrastructure</groupId>
+    <artifactId>flyway-digital-spring-boot-starter</artifactId>
+    <version>1.2.9.1</version>
 <dependency>
     <groupId>com.cbkj.infrastructure</groupId>
     <artifactId>flyway-digital-spring-boot-starter</artifactId>
