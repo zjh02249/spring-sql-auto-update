@@ -406,3 +406,102 @@ mvn clean test -pl flyway-digital-core
 
 ---
 
+---
+
+## ADR-011: 支持库名.表名格式的SQL执行
+
+**日期**: 2026-02-25  
+**状态**: ✅ 已采纳
+
+### 背景
+
+用户需要在SQL迁移脚本中使用跨数据库操作，例如：
+```sql
+UPDATE cbkj_web_parameter.sys_admin_menu SET menu_name = '候诊管理' WHERE menu_id = 'digital_code_21';
+```
+
+但系统在执行这类SQL时会失败，错误信息为：
+```
+Table 'cbkj_web_api_digital.sys_admin_menu' doesn't exist
+```
+
+### 问题分析
+
+1. 数据库连接默认使用cbkj_web_api_digital数据库
+2. SQL中指定了cbkj_web_parameter数据库中的表
+3. 系统没有自动切换到正确的数据库
+4. 导致在错误的数据库中查找表
+
+### 决策
+
+实现自动数据库切换功能：
+1. **extractDatabaseName()**: 从SQL语句中提取数据库名
+   - 支持UPDATE、DELETE FROM、INSERT INTO等语句
+   - 支持带反引号的格式：`db`.`table`
+   - 使用不区分大小写的匹配
+   - 保持数据库名的原始大小写
+
+2. **switchDatabase()**: 自动切换到目标数据库
+   - 使用USE database语句
+   - 失败时记录警告但继续执行
+   - 提供容错能力
+
+3. **修改executeSql()**: 在执行每条SQL前检查
+   - 提取数据库名（如果存在）
+   - 如果与当前数据库不同，则切换
+   - 跟踪当前数据库避免重复切换
+
+### 实现细节
+
+```java
+// 从SQL中提取数据库名
+private String extractDatabaseName(String sqlStatement) {
+    // 使用不区分大小写的正则表达式匹配
+    // 支持 UPDATE db.table, DELETE FROM db.table, INSERT INTO db.table
+}
+
+// 切换数据库
+private boolean switchDatabase(Connection connection, String databaseName) {
+    // 执行 USE databaseName
+    // 失败时返回false但不抛异常
+}
+
+// 修改executeSql()
+private void executeSql(Connection connection, String sqlContent, String scriptName) {
+    // 每条SQL执行前：
+    // 1. 提取数据库名
+    // 2. 如果需要，切换数据库
+    // 3. 执行SQL
+}
+```
+
+### 理由
+
+1. **用户需求**: 企业项目经常需要跨数据库操作
+2. **向后兼容**: 不影响现有的SQL执行逻辑
+3. **容错设计**: 切换失败时继续执行，不会导致整个迁移失败
+4. **简单实用**: 自动处理，用户无需手动添加USE语句
+
+### 影响
+
+- ✅ **优点**:
+  - 支持跨数据库SQL执行
+  - 自动处理，用户体验好
+  - 容错能力强
+  - 向后兼容
+  
+- ⚠️ **限制**:
+  - 只支持MySQL风格的USE语句
+  - 不支持其他数据库的跨库语法（如PostgreSQL的schema）
+
+### 测试覆盖
+
+新增测试用例 testExtractDatabaseName() 验证：
+- ✅ UPDATE db.table SET ...
+- ✅ DELETE FROM db.table WHERE ...
+- ✅ INSERT INTO db.table VALUES ...
+- ✅ 带反引号的表名：`db`.`table`
+- ✅ 不带库名的语句（应返回null）
+- ✅ 保持数据库名的原始大小写
+
+
