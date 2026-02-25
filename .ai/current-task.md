@@ -1,48 +1,45 @@
 # 当前任务
 
 **任务状态**: ✅ 已完成
-**最后更新**: 2026-02-25 16:00
+**最后更新**: 2026-02-25 17:20
 **负责人**: AI Assistant (Sisyphus)
 
 ---
 
 ## 📋 当前目标
 
-✅ **已完成**: 修复反引号格式的库名.表名SQL执行bug
+✅ **已完成**: 修复SQL执行后未切换回默认数据库的严重bug
 
 ---
 
 ## 任务描述
 
 ### 主要任务
-修复当SQL语句使用反引号格式的库名.表名格式（如 `UPDATE \`cbkj_web_parameter\`.\`sys_admin_menu\` SET ...`）时，系统无法正确识别和执行的问题。
+修复当SQL脚本中包含跨数据库操作时（如先切换到其他数据库执行SQL，然后返回继续执行），后续未指定数据库名的SQL会继续使用之前切换的数据库的问题。
 
 ### 子任务清单
-- [x] 分析问题：正则表达式无法匹配带反引号的数据库名
-- [x] 修复SqlExecutor.java：改进extractDatabaseName()方法的正则表达式
-- [x] 支持方案1：`db`.table 格式（反引号包裹的数据库名）
-- [x] 支持方案2：db.table 格式（无引号的数据库名）
-- [x] 修复DELETE FROM和INSERT INTO语句的匹配
+- [x] 分析问题：SQL执行后未切换回默认数据库
+- [x] 修复SqlExecutor.java：在每条SQL执行前先切换回默认数据库
+- [x] 修复SqlExecutor.java：在每条SQL执行后立即切换回默认数据库
 - [x] 运行测试验证：所有56个测试通过
 - [x] 提交代码到Git仓库
 - [x] 同步更新文档
-- [x] 发布v1.2.9.1到Maven仓库
+- [x] 发布v1.2.9.3到Maven仓库
 
 ---
 
 ## 🐛 遇到的问题
 
-### 问题 1: 正则表达式无法匹配反引号格式
+### 问题 1: SQL执行后未切换回默认数据库
 **描述**:
-- SQL语句：`UPDATE \`cbkj_web_parameter\`.\`sys_admin_menu\` SET menu_name = '候诊管理'`
-- 原正则：`UPDATE|FROM|INTO\\s+[\`\"]?([a-zA-Z_][a-zA-Z0-9_]*)\[\`\"]?\\.`
-- 问题：无法匹配反引号包裹的数据库名
+- 场景：SQL脚本中第一个SQL切换到其他数据库，后续SQL未指定数据库名
+- 问题：后续SQL继续使用切换后的数据库，而非默认数据库
+- 影响：导致SQL执行到错误的数据库
 
 **解决方案**:
-- 改进正则表达式，支持两种方案
-- 方案1：匹配 `db`.table 格式（反引号包裹的数据库名）
-- 方案2：匹配 db.table 格式（无引号的数据库名）
-- 支持 UPDATE、DELETE FROM、INSERT INTO 语句
+- 在每条SQL执行前先切换回默认数据库
+- 在每条SQL执行后立即切换回默认数据库
+- 确保每条SQL都在正确的数据库上执行
 
 **结果**: ✅ 问题已解决
 
@@ -57,37 +54,38 @@
 ## ✅ 已完成的工作
 
 ### 1. 核心修复
-- ✅ 改进extractDatabaseName()方法：支持反引号和无引号格式
-- ✅ 支持方案1：`db`.table 格式 - `^\\s*(UPDATE|DELETE\\s+FROM|INSERT\\s+INTO)\\s+\`([^\`]+)\`\\.`
-- ✅ 支持方案2：db.table 格式 - `^\\s*(UPDATE|DELETE\\s+FROM|INSERT\\s+INTO)\\s+([a-zA-Z_][a-zA-Z0-9_]*)\\.
-- ✅ 修改executeSql()方法：自动检测并切换数据库
-- ✅ 支持多种SQL语句：UPDATE、DELETE FROM、INSERT INTO
+- ✅ 在executeSql()方法中：每条SQL执行前切换回默认数据库
+- ✅ 在executeSql()方法中：每条SQL执行后立即切换回默认数据库
+- ✅ 保持对跨数据库SQL的支持（通过db.table格式）
 
 ### 2. 测试覆盖
 - ✅ 所有56个测试用例通过
 
 ### 3. 版本发布
-- ✅ 更新版本号为1.2.9.1
+- ✅ 更新版本号为1.2.9.3
 - ✅ 发布到Maven仓库
 
 ### 4. 文档更新
 - ✅ 更新 current-task.md：记录本次任务
-- ✅ 更新 decisions.md：新增ADR-012决策记录
+- ✅ 更新 decisions.md：新增ADR-013决策记录
 - ✅ 更新 summary.md：更新项目状态
+- ✅ 更新 constraints.md：新增自动提交发布规则
 - ✅ 更新 README.md：更新版本号
+- ✅ 更新其他.ai文件
 
 ---
 
 ## 📊 工作统计
 
 ```
-1 commit, 50+ insertions(+)
+2 commits, 50+ insertions(+)
 ```
 
 **修改的文件**:
-- SqlExecutor.java: 改进extractDatabaseName()正则表达式
-- pom.xml: 更新版本号为1.2.9.1
+- SqlExecutor.java: 修复数据库切换逻辑
+- pom.xml: 更新版本号为1.2.9.3
 - .ai/*.md: 更新文档
+- README.md: 更新版本号
 
 **测试结果**:
 - ✅ SqlExecutorTest: 11/11 通过
@@ -144,8 +142,9 @@ mvn clean test -pl flyway-digital-core
 | 2026-02-13 | 发布 v1.2.7 到 Maven 仓库 | ✅ 已完成 |
 | 2026-02-25 | 修复库名.表名格式的SQL执行bug (v1.2.9) | ✅ 已完成 |
 | 2026-02-25 | 修复反引号格式的SQL执行bug (v1.2.9.1) | ✅ 已完成 |
+| 2026-02-25 | 修复SQL执行后未切换回默认数据库bug (v1.2.9.3) | ✅ 已完成 |
 
 ---
 
-**状态**: ✅ 所有任务完成，v1.2.9.1 已发布
-**版本**: v1.2.9.1 已发布到 Maven 仓库
+**状态**: ✅ 所有任务完成，v1.2.9.3 已发布
+**版本**: v1.2.9.3 已发布到 Maven 仓库

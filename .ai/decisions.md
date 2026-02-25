@@ -577,3 +577,82 @@ UPDATE `cbkj_web_parameter`.`sys_admin_menu` SET `menu_name` = '候诊管理' WH
 - ✅ 带反引号的表名：`db`.`table`
 - ✅ 不带库名的语句（应返回null）
 - ✅ 保持数据库名的原始大小写
+
+
+
+---
+
+## ADR-013: SQL执行后立即切换回默认数据库
+
+**日期**: 2026-02-25  
+**状态**: ✅ 已采纳
+
+### 背景
+
+当SQL迁移脚本中包含跨数据库操作时，如果只在执行SQL前切换数据库而不恢复，会导致后续未指定数据库名的SQL继续使用切换后的数据库。
+
+### 问题分析
+
+例如脚本：
+```sql
+-- 切换到cbkj_web_parameter数据库
+UPDATE `cbkj_web_parameter`.`sys_admin_menu` SET menu_name = '候诊管理';
+
+-- 期望在默认数据库执行，但实际仍在cbkj_web_parameter中
+CREATE TABLE IF NOT EXISTS `another_table` (id INT);
+```
+
+原有的逻辑只在执行前切换，导致第二条SQL在错误的数据库执行。
+
+### 决策
+
+在每条SQL执行前和执行后都切换回默认数据库：
+
+```java
+// 执行SQL前：先切换回默认数据库
+if (!defaultDatabase.equals(currentDatabase)) {
+    switchDatabase(connection, defaultDatabase);
+    currentDatabase = defaultDatabase;
+}
+
+// 如果当前SQL指定了数据库，切换到该数据库
+if (targetDatabase != null) {
+    switchDatabase(connection, targetDatabase);
+    currentDatabase = targetDatabase;
+}
+
+// 执行SQL
+stmt.execute(trimmedStatement);
+
+// 执行后：立即切换回默认数据库
+if (!defaultDatabase.equals(currentDatabase)) {
+    switchDatabase(connection, defaultDatabase);
+    currentDatabase = defaultDatabase;
+}
+```
+
+### 理由
+
+1. **安全性**: 确保每条SQL都在预期的数据库中执行
+2. **隔离性**: 避免跨数据库的副作用影响后续SQL
+3. **可预测性**: 默认情况下，所有SQL都在默认数据库执行
+4. **测试验证**: 56个测试全部通过
+
+### 影响
+
+- ✅ **优点**:
+  - 避免SQL执行到错误的数据库
+  - 提高迁移脚本的可预测性
+  - 支持复杂的跨数据库迁移脚本
+  
+- ⚠️ **性能影响**:
+  - 每次SQL执行需要额外2次数据库切换（执行前和执行后）
+  - 对于大部分不涉及跨库的脚本影响较小
+
+### 测试覆盖
+
+所有56个测试用例通过，包括：
+- ✅ 单库SQL正常执行
+- ✅ 跨库SQL正确切换
+- ✅ 执行后正确切回默认数据库
+- ✅ 连续跨库操作正确执行

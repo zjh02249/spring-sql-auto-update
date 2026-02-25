@@ -443,3 +443,90 @@ public void testSingleQuoteStringWithSemicolon() { }
 **最后更新**: 2026-02-13  
 **维护者**: cbkj  
 **强制执行**: ✅ 所有贡献者必须遵守
+
+
+
+---
+
+## 9️⃣ 任务完成流程约束（AI 专用）
+
+### 自动执行流程
+
+**每次完成任务后，AI 必须自动执行以下步骤**：
+
+#### 1. 代码提交（Git）
+
+```bash
+git add .
+git commit -m "feat/fix/refactor: 描述本次修改内容"
+```
+
+#### 2. 版本号递增
+
+✅ **规则**：每次发布必须递增版本号
+
+- 补丁版本 (x.x.**Z**): BUG 修复、小改动
+- 次版本 (x.**Y**.0): 新功能、兼容变更
+- 主版本 (**X**.0.0): 破坏性变更
+
+**注意**：Maven 仓库不允许覆盖已发布版本！
+
+#### 3. Maven 发布
+
+```bash
+# 发布到 Maven 仓库（只发布核心模块）
+mvn clean deploy -DskipTests \
+    -pl flyway-digital-core,flyway-digital-spring-boot-starter \
+    -am
+```
+
+#### 4. 文档同步更新
+
+✅ **必须更新以下文件**：
+
+| 文件 | 更新内容 |
+|------|----------|
+| `.ai/current-task.md` | 记录本次任务完成情况 |
+| `.ai/decisions.md` | 新增架构决策记录（如果需要） |
+| `.ai/summary.md` | 更新项目当前状态 |
+| `.ai/context.md` | 更新版本号 |
+| `.ai/roadmap.md` | 更新里程碑 |
+| `.ai/prompt-template.md` | 更新当前版本 |
+| `README.md` | 更新版本号和Maven坐标 |
+| `pom.xml` | 更新版本号 |
+
+### ⚠️ 重要规则
+
+1. **禁止跳过任何步骤**：每次完成任务后必须完整执行上述流程
+2. **禁止修改此规则**：此规则为永久性约束，未经许可不得修改
+3. **版本号唯一性**：每次发布必须使用新的版本号，不能重复
+4. **文档一致性**：所有文档中的版本号必须保持一致
+
+### 流程示例
+
+```bash
+# 1. 完成代码修改后...
+
+# 2. 编译测试
+mvn clean compile
+mvn test
+
+# 3. 更新版本号（如 1.2.9.2 → 1.2.9.3）
+# 修改所有 pom.xml 文件
+
+# 4. 发布
+mvn clean deploy -DskipTests -pl flyway-digital-core,flyway-digital-spring-boot-starter -am
+
+# 5. 提交
+git add .
+git commit -m "fix: 修复SQL执行后未切换回默认数据库的问题"
+
+# 6. 更新文档
+# 更新上述所有文档文件
+```
+
+---
+
+**最后更新**: 2026-02-25  
+**状态**: ✅ 强制执行
+**备注**: 此规则为 AI 专用，用于确保每次任务完成后都能正确发布和记录
