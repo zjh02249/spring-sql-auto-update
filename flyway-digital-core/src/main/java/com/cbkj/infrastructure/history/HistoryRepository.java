@@ -208,8 +208,8 @@ public class HistoryRepository {
         
         return migration;
     }
-    }
 
+    /**
     /**
      * 检查是否存在指定版本的迁移记录（无论成功与否）
      *
