@@ -89,15 +89,31 @@ public class SqlExecutor {
             return false;
         }
 
-        try (Statement stmt = connection.createStatement()) {
-            // 使用 USE 语句切换数据库
-            String useSql = "USE " + databaseName;
-            stmt.execute(useSql);
-            LOGGER.debug("[SqlExecutor] Successfully switched to database: {}", databaseName);
-            return true;
+        try {
+            // 检测数据库类型
+            String databaseProductName = connection.getMetaData().getDatabaseProductName();
+            String dbNameLower = databaseProductName != null ? databaseProductName.toLowerCase() : "";
+            
+            // 达梦数据库使用 SET SCHEMA 语法
+            if (dbNameLower.contains("dm") || dbNameLower.contains("达梦")) {
+                try (Statement stmt = connection.createStatement()) {
+                    String useSql = "SET SCHEMA " + databaseName;
+                    stmt.execute(useSql);
+                    LOGGER.debug("[SqlExecutor] Successfully switched to DM schema: {}", databaseName);
+                    return true;
+                }
+            }
+            
+            // MySQL 等数据库使用 USE 语法
+            try (Statement stmt = connection.createStatement()) {
+                String useSql = "USE " + databaseName;
+                stmt.execute(useSql);
+                LOGGER.debug("[SqlExecutor] Successfully switched to database: {}", databaseName);
+                return true;
+            }
         } catch (SQLException e) {
-            // 切换失败（可能是权限问题或数据库不存在），记录日志但继续执行
-            LOGGER.warn("[SqlExecutor] Failed to switch to database '{}': {}. Will try to execute SQL as-is.",
+            // 切换失败，记录 debug 日志但继续执行
+            LOGGER.debug("[SqlExecutor] Failed to switch to database '{}': {}. Will try to execute SQL as-is.",
                 databaseName, e.getMessage());
             return false;
         }
@@ -289,7 +305,7 @@ public class SqlExecutor {
             
             // 重要：每次执行SQL前，先切换回默认数据库
             // 这样可以确保没有指定数据库名的SQL使用默认数据库
-            if (!defaultDatabase.equals(currentDatabase)) {
+            if (!java.util.Objects.equals(defaultDatabase, currentDatabase)) {
                 LOGGER.debug("[SqlExecutor] [PATH:{}] Switching back to default database before executing statement #{}: {}",
                         scriptName, statementCount, defaultDatabase);
                 switchDatabase(connection, defaultDatabase);
@@ -315,7 +331,7 @@ public class SqlExecutor {
                 
                 // 重要：执行完成后立即切换回默认数据库
                 // 避免影响后续操作或其他组件使用连接
-                if (!defaultDatabase.equals(currentDatabase)) {
+                if (!java.util.Objects.equals(defaultDatabase, currentDatabase)) {
                     LOGGER.debug("[SqlExecutor] [PATH:{}] Switching back to default database after statement #{}: {}",
                             scriptName, statementCount, defaultDatabase);
                     switchDatabase(connection, defaultDatabase);
