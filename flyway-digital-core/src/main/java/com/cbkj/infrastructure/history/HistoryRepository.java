@@ -209,3 +209,50 @@ public class HistoryRepository {
         return migration;
     }
 }
+    /**
+     * 检查是否存在指定版本的迁移记录（无论成功与否）
+     *
+     * @param version 版本号
+     * @return 如果存在返回true，否则返回false
+     */
+    public boolean existsByVersion(String version) throws SQLException {
+        String sql = "SELECT COUNT(*) FROM " + tableName + " WHERE version = ?";
+
+        try (Connection connection = dataSource.getConnection();
+             PreparedStatement stmt = connection.prepareStatement(sql)) {
+            stmt.setString(1, version);
+
+            try (ResultSet rs = stmt.executeQuery()) {
+                if (rs.next()) {
+                    return rs.getInt(1) > 0;
+                }
+            }
+        }
+
+        return false;
+    }
+
+    /**
+     * 检查是否存在指定版本和状态的迁移记录
+     *
+     * @param version 版本号
+     * @param success 成功状态（true=成功，false=失败）
+     * @return 如果存在返回true，否则返回false
+     */
+    public boolean existsByVersionAndSuccess(String version, boolean success) throws SQLException {
+        String sql = "SELECT COUNT(*) FROM " + tableName + " WHERE version = ? AND success = ?";
+
+        try (Connection connection = dataSource.getConnection();
+             PreparedStatement stmt = connection.prepareStatement(sql)) {
+            stmt.setString(1, version);
+            stmt.setBoolean(2, success);
+
+            try (ResultSet rs = stmt.executeQuery()) {
+                if (rs.next()) {
+                    return rs.getInt(1) > 0;
+                }
+            }
+        }
+
+        return false;
+    }

@@ -158,6 +158,21 @@ public class FlywayDigital {
         String version = migration.getVersion().toString();
         String script = migration.getScript();
 
+        // 检查是否已有该版本的失败记录
+        if (historyRepository.existsByVersionAndSuccess(version, false)) {
+            throw new IllegalStateException(
+                    "[FlywayDigital] Migration version " + version + " has failed in a previous execution. " +
+                    "Please check and delete the failed record from history table before retrying. " +
+                    "Table: " + config.getTable() + ", Version: " + version + ", success=0");
+        }
+
+        // 检查是否已有该版本的记录（无论成功与否）
+        // 如果有，则不重复插入
+        if (historyRepository.existsByVersion(version)) {
+            LOGGER.info("[FlywayDigital] Migration {} already exists in history, skipping execution", version);
+            return;
+        }
+
         LOGGER.info("[FlywayDigital] Executing migration: {} - {}", version, script);
 
         // 获取当前数据库用户
