@@ -660,6 +660,87 @@ public boolean existsByVersionAndSuccess(String version, boolean success) throws
 - ✅ 失败的迁移记录到历史表
 - ✅ 重复执行同一版本不会重复插入
 
+---
+
+## ADR-014: SQL执行失败时的历史记录处理策略
+
+**日期**: 2026-02-27
+**状态**: ✅ 已采纳
+
+### 背景
+
+在SQL迁移执行失败时，发现历史表会重复插入相同版本的记录（SUCCESS=0）。这导致：
+1. 重复记录堆积
+2. 开发者无法区分哪些是新的失败
+3. 自动重试机制可能覆盖原有记录
+
+### 决策
+
+实现以下策略：
+
+1. **执行前检查失败记录**
+   - 如果该版本已有失败记录（success=0），抛出异常
+   - 提示开发者手动删除失败记录后重试
+
+2. **避免重复插入**
+   - 如果该版本已有记录（无论成功与否），跳过执行
+   - 使用 `existsByVersion()` 方法检查
+
+3. **清晰的错误信息**
+   - 明确告知用户哪个版本失败
+   - 提供解决方案（手动删除记录）
+
+### 实现细节
+
+```java
+// 在 executeMigration 方法中添加检查
+if (historyRepository.existsByVersionAndSuccess(version, false)) {
+    throw new IllegalStateException(
+        "[FlywayDigital] Migration version " + version + " has failed in a previous execution. " +
+        "Please check and delete the failed record from history table before retrying. " +
+        "Table: " + config.getTable() + ", Version: " + version + ", success=0");
+}
+
+if (historyRepository.existsByVersion(version)) {
+    LOGGER.info("[FlywayDigital] Migration {} already exists in history, skipping execution", version);
+    return;
+}
+```
+
+### 新增方法
+
+在 HistoryRepository.java 中添加：
+
+```java
+public boolean existsByVersion(String version) throws SQLException
+public boolean existsByVersionAndSuccess(String version, boolean success) throws SQLException
+```
+
+### 理由
+
+1. **数据完整性**: 防止重复记录堆积
+2. **安全性**: 失败的迁移需要人工确认后才能重试
+3. **可追溯性**: 保留失败记录便于排查问题
+4. **用户体验**: 清晰的错误提示帮助开发者快速解决问题
+
+### 影响
+
+- ✅ **优点**:
+  - 避免重复记录
+  - 强制人工介入处理失败
+  - 更好的错误提示
+
+- ⚠️ **限制**:
+  - 需要手动删除失败记录后才能重试
+  - 可能影响自动化流程
+
+### 测试覆盖
+
+所有56个测试用例通过，包括：
+- ✅ 正常迁移执行
+- ✅ 失败的迁移记录到历史表
+- ✅ 重复执行同一版本不会重复插入
+
 
 ---
 
