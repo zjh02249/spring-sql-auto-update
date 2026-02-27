@@ -102,7 +102,28 @@ public class SqlExecutor {
                     LOGGER.debug("[SqlExecutor] Successfully switched to DM schema: {}", databaseName);
                     return true;
                 }
+            
+            // PostgreSQL 使用 SET SCHEMA 语法
+            if (dbNameLower.contains("postgres") || dbNameLower.contains("pgsql")) {
+                try (Statement stmt = connection.createStatement()) {
+                    String useSql = "SET SCHEMA " + databaseName;
+                    stmt.execute(useSql);
+                    LOGGER.debug("[SqlExecutor] Successfully switched to PostgreSQL schema: {}", databaseName);
+                    return true;
+                }
             }
+            
+            // Oracle 使用 ALTER SESSION SET CURRENT_SCHEMA 语法
+            if (dbNameLower.contains("oracle")) {
+                try (Statement stmt = connection.createStatement()) {
+                    String useSql = "ALTER SESSION SET CURRENT_SCHEMA = " + databaseName;
+                    stmt.execute(useSql);
+                    LOGGER.debug("[SqlExecutor] Successfully switched to Oracle schema: {}", databaseName);
+                    return true;
+                }
+            }
+            
+            // MySQL 等数据库使用 USE 语法
             
             // MySQL 等数据库使用 USE 语法
             try (Statement stmt = connection.createStatement()) {
@@ -117,7 +138,44 @@ public class SqlExecutor {
                 databaseName, e.getMessage());
             return false;
         }
+
+    /**
+     * 获取默认数据库/Schema（根据数据库类型选择正确的方式）
+     * - MySQL: 使用 getCatalog()
+     * - PostgreSQL/Oracle/达梦: 使用 getSchema()
+     *
+     * @param connection 数据库连接
+     * @return 默认数据库或Schema名称
+     */
+    private String getDefaultDatabaseOrSchema(Connection connection) {
+        try {
+            String databaseProductName = connection.getMetaData().getDatabaseProductName();
+            String dbNameLower = databaseProductName != null ? databaseProductName.toLowerCase() : "";
+            
+            // 判断是否为需要使用 Schema 的数据库类型
+            boolean useSchema = dbNameLower.contains("postgres") 
+                    || dbNameLower.contains("pgsql") 
+                    || dbNameLower.contains("oracle")
+                    || dbNameLower.contains("dm")
+                    || dbNameLower.contains("达梦");
+            
+            if (useSchema) {
+                String schema = connection.getSchema();
+                LOGGER.debug("[SqlExecutor] Using getSchema() for database: {}, schema: {}", databaseProductName, schema);
+                return schema;
+            } else {
+                String catalog = connection.getCatalog();
+                LOGGER.debug("[SqlExecutor] Using getCatalog() for database: {}, catalog: {}", databaseProductName, catalog);
+                return catalog;
+            }
+        } catch (SQLException e) {
+            LOGGER.warn("[SqlExecutor] Failed to get default database/schema: {}", e.getMessage());
+            return null;
+        }
     }
+
+    /**
+     * 在事务中执行SQL脚本
 
     /**
      * 在事务中执行SQL脚本
@@ -281,9 +339,9 @@ public class SqlExecutor {
      * 执行完成后立即切换回默认数据库，确保不影响后续操作
      */
     private void executeSql(Connection connection, String sqlContent, String scriptName) throws SQLException {
-        // 获取默认数据库（数据源连接的初始数据库）
-        String defaultDatabase = connection.getCatalog();
-        LOGGER.debug("[SqlExecutor] [PATH:{}] Default database: {}", scriptName, defaultDatabase);
+        // 获取默认数据库/Schema（根据数据库类型选择正确的方式）
+        String defaultDatabase = getDefaultDatabaseOrSchema(connection);
+        LOGGER.info("[SqlExecutor] [PATH:{}] Default database/schema: {}", scriptName, defaultDatabase);
         
         // 当前使用的数据库，初始为默认数据库
         String currentDatabase = defaultDatabase;
