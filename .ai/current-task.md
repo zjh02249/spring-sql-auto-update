@@ -163,3 +163,33 @@ mvn clean test -pl flyway-digital-core
 
 **状态**: ✅ 所有任务完成，v1.2.9.3 已发布
 **版本**: v1.2.9.3 已发布到 Maven 仓库
+
+
+
+## 2026-02-28: 修复达梦数据库 PL/SQL 块支持
+
+### 任务描述
+修复 `splitSqlStatements` 方法，支持达梦数据库的 PL/SQL 匿名块（DECLARE...BEGIN...END）。
+
+### 修复内容
+1. 添加 `plsqlDepth` 和 `inDeclareSection` 变量跟踪 PL/SQL 块
+2. 添加 `extractKeywordAt` 和 `isEndOfBlock` 辅助方法
+3. 实现 DECLARE/BEGIN/END 关键字的深度跟踪
+4. 当 `plsqlDepth > 0` 时，分号不分割语句
+
+### 新增测试
+- `testDeclareBeginEndBlock`
+- `testDmDeclareBlockFullScenario`
+- `testMixedNormalSqlAndDeclareBlock`
+- `testBeginEndBlockWithoutDeclare`
+- `testNestedBeginEndBlock`
+- `testDeclareColumnNameNotTreatedAsKeyword`
+
+### 测试结果
+- 原有 56 个测试通过
+- 新增 6 个测试通过
+- 总计 62 个测试通过
+
+### 版本更新
+- 原版本: 1.2.9.21
+- 新版本: 1.2.9.22

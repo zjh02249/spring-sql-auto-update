@@ -252,7 +252,9 @@ public class SqlExecutor {
         boolean inDoubleQuote = false;
         boolean inLineComment = false;
         boolean inBlockComment = false;
-        
+        // PL/SQL block tracking for DECLARE...BEGIN...END blocks
+        int plsqlDepth = 0;  // Nesting depth of BEGIN/END blocks
+        boolean inDeclareSection = false;  // True between DECLARE and BEGIN
         for (int i = 0; i < sqlContent.length(); i++) {
             char c = sqlContent.charAt(i);
             char nextChar = (i + 1 < sqlContent.length()) ? sqlContent.charAt(i + 1) : '\0';

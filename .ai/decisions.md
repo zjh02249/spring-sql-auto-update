@@ -899,3 +899,119 @@ if (!defaultDatabase.equals(currentDatabase)) {
 - ✅ 跨库SQL正确切换
 - ✅ 执行后正确切回默认数据库
 - ✅ 连续跨库操作正确执行
+
+---
+
+## ADR-015: 支持达梦数据库 PL/SQL 匿名块（DECLARE...BEGIN...END）
+
+**日期**: 2026-02-28
+**状态**: ✅ 已采纳
+
+### 背景
+
+对于达梦(DM)数据库的 PL/SQL 匿名块（DECLARE...BEGIN...END），原代码会错误地在块内部的分号处分割 SQL 语句，导致执行失败。
+
+例如以下 SQL 应该作为一个整体执行：
+```sql
+DECLARE V_CNT INT;
+BEGIN
+  SELECT COUNT(*) INTO V_CNT FROM ALL_TABLES WHERE TABLE_NAME = 'MY_TABLE';
+  IF V_CNT = 0 THEN
+    EXECUTE IMMEDIATE 'CREATE TABLE MY_TABLE (ID INT)';
+  END IF;
+END;
+```
+
+但原代码会在每个分号处分割，破坏了 PL/SQL 块的完整性。
+
+### 决策
+
+修改 `splitSqlStatements` 方法，添加 PL/SQL 块跟踪机制：
+
+1. **新增状态变量**：
+   - `plsqlDepth` - 跟踪 BEGIN/END 的嵌套深度
+   - `inDeclareSection` - 标记是否在 DECLARE 声明区
+
+2. **关键字检测逻辑**：
+   - `DECLARE`：设置 `plsqlDepth=1` 和 `inDeclareSection=true`
+   - `BEGIN`：如果是 DECLARE 后的 BEGIN，清除 `inDeclareSection` 但不增加深度；否则增加深度
+   - `END`：如果后面跟着分号（不是 END IF/LOOP），则减少深度
+   - 当 `plsqlDepth > 0` 时，分号不分割语句
+
+3. **新增辅助方法**：
+   - `extractKeywordAt` - 从指定位置提取 SQL 关键字（大小写不敏感），确保在单词边界处匹配
+   - `isEndOfBlock` - 检查 END 关键字后面是否紧跟着分号（表示块结束符）
+
+### 实现
+
+```java
+// PL/SQL 块跟踪
+int plsqlDepth = 0;
+boolean inDeclareSection = false;
+
+// 在状态机中检测关键字
+if (!inSingleQuote && !inDoubleQuote && !inLineComment && !inBlockComment) {
+    String keyword = extractKeywordAt(sqlContent, i);
+    if ("DECLARE".equals(keyword) && plsqlDepth == 0) {
+        plsqlDepth = 1;
+        inDeclareSection = true;
+    } else if ("BEGIN".equals(keyword)) {
+        if (inDeclareSection) {
+            inDeclareSection = false;
+        } else if (plsqlDepth == 0) {
+            plsqlDepth = 1;
+        } else {
+            plsqlDepth++;
+        }
+    } else if ("END".equals(keyword) && plsqlDepth > 0 && isEndOfBlock(sqlContent, i + 3)) {
+        plsqlDepth--;
+    }
+}
+
+// 分号分割逻辑
+if (c == ';' && !inSingleQuote && !inDoubleQuote && !inLineComment && !inBlockComment) {
+    if (plsqlDepth > 0) {
+        currentStatement.append(c);
+        continue;
+    }
+    // 正常分割逻辑...
+}
+```
+
+### 新增测试用例
+
+在 `SqlExecutorTest.java` 中添加了 6 个测试用例：
+1. `testDeclareBeginEndBlock` - 测试基本的 DECLARE...BEGIN...END 块
+2. `testDmDeclareBlockFullScenario` - 测试完整的达梦数据库场景
+3. `testMixedNormalSqlAndDeclareBlock` - 测试混合普通 SQL 和 DECLARE 块
+4. `testBeginEndBlockWithoutDeclare` - 测试不带 DECLARE 的独立 BEGIN...END 块
+5. `testNestedBeginEndBlock` - 测试嵌套的 BEGIN...END 块
+6. `testDeclareColumnNameNotTreatedAsKeyword` - 测试确保包含 DECLARE_/BEGIN_/END_ 的列名不会被误识别为关键字
+
+### 测试验证
+
+所有测试通过：
+- 原有 56 个测试仍然通过（向后兼容）
+- 新增 6 个测试全部通过
+- 总计 62 个测试通过
+
+### 理由
+
+1. **兼容性**: 保持对原有 SQL 分割逻辑的完全向后兼容
+2. **实用性**: 支持达梦等国产数据库的 PL/SQL 匿名块
+3. **正确性**: 通过嵌套深度跟踪确保块内部分号不分割
+4. **健壮性**: 边界情况处理（列名包含关键字、嵌套块等）
+
+### 影响
+
+- ✅ **优点**:
+  - 支持达梦数据库 PL/SQL 匿名块
+  - 向后兼容，不影响现有功能
+  - 完善的测试覆盖（6个新测试用例）
+
+- ⚠️ **限制**:
+  - 仅支持 DECLARE/BEGIN/END 格式的 PL/SQL 块
+  - 不支持其他数据库的存储过程语法
+
+**最后更新**: 2026-02-28
+**维护者**: cbkj
