@@ -223,4 +223,115 @@ public class SqlExecutorTest {
         assertNull(result5);
     }
 
-} 
+    // ==================== PL/SQL 块测试用例 ====================
+
+    /**
+     * 测试 12：基本的 DECLARE...BEGIN...END 块
+     */
+    @Test
+    public void testDeclareBeginEndBlock() throws Exception {
+        String sql = "DECLARE V_CNT INT; BEGIN SELECT 1 INTO V_CNT FROM dual; END;";
+        String[] result = splitSqlStatements(sql);
+        
+        assertEquals("应返回 1 个结果（PL/SQL 块不应被分号分割）", 1, result.length);
+        assertTrue("应包含完整的 PL/SQL 块", result[0].contains("DECLARE"));
+        assertTrue("应包含完整的 PL/SQL 块", result[0].contains("BEGIN"));
+        assertTrue("应包含完整的 PL/SQL 块", result[0].contains("END"));
+    }
+
+    /**
+     * 测试 13：完整的达梦数据库场景（用户提供的实际 SQL）
+     */
+    @Test
+    public void testDmDeclareBlockFullScenario() throws Exception {
+        String sql = "DECLARE\n" +
+            "  V_CNT INT;\n" +
+            "BEGIN\n" +
+            "SELECT COUNT(*) INTO V_CNT\n" +
+            "FROM ALL_TABLES\n" +
+            "WHERE TABLE_NAME = 'T_PERSONAL_PRESCRIPTION_DEPT_MAPPING'\n" +
+            "  AND OWNER = 'CBKJ_WEB_API';\n" +
+            "\n" +
+            "IF V_CNT = 0 THEN\n" +
+            "EXECUTE IMMEDIATE '\n" +
+            "      CREATE TABLE CBKJ_WEB_API.T_PERSONAL_PRESCRIPTION_DEPT_MAPPING\n" +
+            "      (\n" +
+            "        ID INTEGER IDENTITY(1,1) NOT NULL,\n" +
+            "        APP_ID VARCHAR(32) NOT NULL,\n" +
+            "        DEPT_ID_ONE VARCHAR(32) NOT NULL,\n" +
+            "        DEPT_ID_TWO VARCHAR(32) NOT NULL,\n" +
+            "        CREATE_TIME TIMESTAMP NOT NULL,\n" +
+            "        CREATE_USER_NAME VARCHAR(256),\n" +
+            "        CREATE_USER_ID VARCHAR(32),\n" +
+            "        CONSTRAINT PK_T_P_P_D_M PRIMARY KEY (ID)\n" +
+            "      )';\n" +
+            "END IF;\n" +
+            "END;";
+        
+        String[] result = splitSqlStatements(sql);
+        
+        assertEquals("应返回 1 个结果（达梦 PL/SQL 块不应被分号分割）", 1, result.length);
+        assertTrue("应包含 DECLARE", result[0].contains("DECLARE"));
+        assertTrue("应包含 BEGIN", result[0].contains("BEGIN"));
+        assertTrue("应包含 CREATE TABLE", result[0].contains("CREATE TABLE"));
+        assertTrue("应包含 END 关键字", result[0].contains("END"));
+    }
+
+    /**
+     * 测试 14：混合普通 SQL 和 DECLARE 块
+     */
+    @Test
+    public void testMixedNormalSqlAndDeclareBlock() throws Exception {
+        String sql = "CREATE TABLE test (id INT);" +
+            "DECLARE v_num INT; BEGIN v_num := 10; END;" +
+            "INSERT INTO test VALUES (1);";
+        
+        String[] result = splitSqlStatements(sql);
+        
+        assertEquals("应返回 3 个结果", 3, result.length);
+        assertTrue("第一个是 CREATE TABLE", result[0].contains("CREATE TABLE"));
+        assertTrue("第二个是 DECLARE 块", result[1].contains("DECLARE"));
+        assertTrue("第三个是 INSERT", result[2].contains("INSERT"));
+    }
+
+    /**
+     * 测试 15：不带 DECLARE 的独立 BEGIN...END 块
+     */
+    @Test
+    public void testBeginEndBlockWithoutDeclare() throws Exception {
+        String sql = "BEGIN SELECT 1; END;";
+        String[] result = splitSqlStatements(sql);
+        
+        assertEquals("应返回 1 个结果", 1, result.length);
+        assertTrue("应包含完整的 BEGIN...END 块", result[0].contains("BEGIN"));
+        assertTrue("应包含完整的 BEGIN...END 块", result[0].contains("END"));
+    }
+
+    /**
+     * 测试 16：嵌套的 BEGIN...END 块
+     */
+    @Test
+    public void testNestedBeginEndBlock() throws Exception {
+        String sql = "BEGIN BEGIN DBMS_OUTPUT.PUT_LINE('inner'); END; DBMS_OUTPUT.PUT_LINE('outer'); END;";
+        String[] result = splitSqlStatements(sql);
+        
+        assertEquals("应返回 1 个结果（嵌套块不应被分割）", 1, result.length);
+        assertTrue("应包含完整的嵌套结构", result[0].contains("BEGIN"));
+        assertTrue("应包含完整的嵌套结构", result[0].contains("END"));
+    }
+
+    /**
+     * 测试 17：确保包含 DECLARE_/BEGIN_/END_ 的列名不会被误识别为关键字
+     */
+    @Test
+    public void testDeclareColumnNameNotTreatedAsKeyword() throws Exception {
+        String sql = "SELECT DECLARE_COLUMN, BEGIN_COL, END_COL FROM my_table;";
+        String[] result = splitSqlStatements(sql);
+        
+        assertEquals("应返回 1 个结果", 1, result.length);
+        assertTrue("应包含列名", result[0].contains("DECLARE_COLUMN"));
+        assertTrue("应包含列名", result[0].contains("BEGIN_COL"));
+        assertTrue("应包含列名", result[0].contains("END_COL"));
+    }
+
+}

@@ -305,8 +305,35 @@ public class SqlExecutor {
                 }
             }
             
+            // 检测 PL/SQL 关键字（仅当不在字符串/注释中时）
+            if (!inSingleQuote && !inDoubleQuote && !inLineComment && !inBlockComment) {
+                // 检测 DECLARE 关键字
+                String keyword = extractKeywordAt(sqlContent, i);
+                if (keyword != null) {
+                    if (keyword.equalsIgnoreCase("DECLARE")) {
+                        plsqlDepth = 1;
+                        inDeclareSection = true;
+                    } else if (keyword.equalsIgnoreCase("BEGIN")) {
+                        if (inDeclareSection) {
+                            // DECLARE 后的 BEGIN，不增加深度
+                            inDeclareSection = false;
+                        } else {
+                            // 独立的 BEGIN，增加深度
+                            plsqlDepth++;
+                        }
+                    } else if (keyword.equalsIgnoreCase("END")) {
+                        // 检查是否是块结束符（END;）而不是 END IF/LOOP
+                        if (isEndOfBlock(sqlContent, i + keyword.length())) {
+                            plsqlDepth--;
+                            if (plsqlDepth < 0) plsqlDepth = 0;
+                        }
+                    }
+                }
+            }
+            
             // 处理语句分割（分号）
-            if (c == ';' && !inSingleQuote && !inDoubleQuote && !inLineComment && !inBlockComment) {
+            // 处理语句分割（分号）
+            if (c == ';' && !inSingleQuote && !inDoubleQuote && !inLineComment && !inBlockComment && plsqlDepth == 0) {
                 String statement = currentStatement.toString().trim();
                 if (!statement.isEmpty()) {
                     statements.add(statement);
@@ -325,6 +352,99 @@ public class SqlExecutor {
         }
         
         return statements.toArray(new String[0]);
+    }
+    
+    /**
+     * 从指定位置提取 SQL 关键字（大小写不敏感）
+     * 确保在单词边界处匹配，避免将 DECLARE_VAR 误识别为 DECLARE
+     *
+     * @param sqlContent SQL 内容
+     * @param index 起始位置
+     * @return 关键字（如果匹配），否则返回 null
+     */
+    private String extractKeywordAt(String sqlContent, int index) {
+        if (index < 0 || index >= sqlContent.length()) {
+            return null;
+        }
+        
+        char c = sqlContent.charAt(index);
+        // 必须是字母开头
+        if (!Character.isLetter(c)) {
+            return null;
+        }
+        
+        // 检查前面是否是非单词字符（单词边界）
+        if (index > 0) {
+            char prev = sqlContent.charAt(index - 1);
+            if (Character.isLetterOrDigit(prev) || prev == '_') {
+                return null;
+            }
+        }
+        
+        // 提取关键字
+        StringBuilder keyword = new StringBuilder();
+        int i = index;
+        while (i < sqlContent.length() && (Character.isLetter(sqlContent.charAt(i)) || sqlContent.charAt(i) == '_')) {
+            keyword.append(sqlContent.charAt(i));
+            i++;
+        }
+        
+        String result = keyword.toString();
+        
+        // 只返回特定关键字
+        if (result.equalsIgnoreCase("DECLARE") || result.equalsIgnoreCase("BEGIN") || result.equalsIgnoreCase("END")) {
+            return result;
+        }
+        
+        return null;
+    }
+    
+    /**
+     * 检查 END 关键字后面是否紧跟着分号（表示块结束符）
+     * 而不是 IF/LOOP 等控制结构
+     *
+     * @param sqlContent SQL 内容
+     * @param endIndex END 关键字之后的位置
+     * @return true 如果是块结束符，false 如果是 END IF/LOOP 等结构
+     */
+    private boolean isEndOfBlock(String sqlContent, int endIndex) {
+        int i = endIndex;
+        // 跳过空白字符
+        while (i < sqlContent.length() && Character.isWhitespace(sqlContent.charAt(i))) {
+            i++;
+        }
+        
+        if (i >= sqlContent.length()) {
+            // END 在文件末尾，假设是块结束
+            return true;
+        }
+        
+        char nextChar = sqlContent.charAt(i);
+        if (nextChar == ';') {
+            return true; // END; 是块结束符
+        }
+        
+        // 检查是否是 END IF 或 END LOOP 等
+        if (Character.isLetter(nextChar)) {
+            // 提取下一个单词
+            StringBuilder word = new StringBuilder();
+            while (i < sqlContent.length() && Character.isLetter(sqlContent.charAt(i))) {
+                word.append(sqlContent.charAt(i));
+                i++;
+            }
+            
+            String nextWord = word.toString();
+            // IF, LOOP, CASE 等表示这不是块结束符
+            if (nextWord.equalsIgnoreCase("IF") || nextWord.equalsIgnoreCase("LOOP") || 
+                nextWord.equalsIgnoreCase("CASE") || nextWord.equalsIgnoreCase("WHILE")) {
+                return false;
+            }
+        }
+        
+        return true;
+    }
+
+    /**
     }
 
     /**

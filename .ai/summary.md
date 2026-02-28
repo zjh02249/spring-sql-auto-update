@@ -1,8 +1,8 @@
 # 当前阶段压缩总结
 
-**生成时间**: 2026-02-27 15:45
-#KN|**适用版本**: v1.2.9.21
-#VW|**会话状态**: ✅ 项目稳定，v1.2.9.21 已发布
+**生成时间**: 2026-02-28 16:30
+**适用版本**: v1.2.9.23
+**会话状态**: ✅ 项目稳定，v1.2.9.23 已发布
 
 ---
 
@@ -10,10 +10,10 @@
 
 ### 基本信息
 - **项目名称**: Flyway Digital
-#PY|- **当前版本**: 1.2.9.22
+- **当前版本**: 1.2.9.23
 - **发布状态**: ✅ 已发布到 Maven 仓库
 - **Git 状态**: ✅ 已提交
-#YN|- **文档版本**: ✅ 已统一更新到 1.2.9.21
+- **文档版本**: ✅ 已统一更新到 1.2.9.23
 - **构建状态**: ✅ 编译通过，测试通过
 
 ### Maven 坐标
@@ -21,24 +21,34 @@
 <dependency>
     <groupId>com.cbkj.infrastructure</groupId>
     <artifactId>flyway-digital-spring-boot-starter</artifactId>
-    #VP|    <version>1.2.9.21</version>
+    <version>1.2.9.23</version>
 </dependency>
 ```
 
 ---
 
-#VT|## ✅ 最近完成的工作 (v1.2.9.21)
+## ✅ 最近完成的工作 (v1.2.9.23)
 
-### Bug 修复
-- **SqlExecutor NPE 问题**: 修复第334行空指针异常
-  - 问题: 当 `connection.getCatalog()` 返回 `null` 时，`defaultDatabase.equals()` 抛出 NPE
-  - 修复: 统一使用 `Objects.equals()` 进行安全比较
-  - 影响: 解决某些数据库或连接配置下的 SQL 执行失败问题
+### PL/SQL 块支持修复
+- **达梦数据库 PL/SQL 块支持**: 修复 DECLARE...BEGIN...END 块被错误分割的问题
+  - 问题: PL/SQL 块内部分号导致 SQL 被错误分割
+  - 修复: 添加 PL/SQL 块跟踪机制，正确识别块边界
+  - 影响: 支持达梦、Oracle 等数据库的 PL/SQL 匿名块
+
+### 新增功能
+- **extractKeywordAt 辅助方法**: 从指定位置提取 SQL 关键字（支持单词边界匹配）
+- **isEndOfBlock 辅助方法**: 区分块结束符 (END;) 与控制结构 (END IF/LOOP)
+- **PL/SQL 块跟踪**: 使用 plsqlDepth 和 inDeclareSection 跟踪块嵌套
 
 ### 测试验证
-- ✅ 所有 56 个单元测试通过
-- ✅ 集成测试通过 (H2 内存数据库)
-- ✅ 编译无警告
+- ✅ 所有 62 个单元测试通过（原有 56 + 新增 6）
+- ✅ 新增测试覆盖:
+  - 基本 DECLARE...BEGIN...END 块
+  - 完整达梦数据库场景
+  - 混合普通 SQL 和 DECLARE 块
+  - 独立 BEGIN...END 块
+  - 嵌套 BEGIN...END 块
+  - 列名包含关键字的情况
 
 ---
 
@@ -66,8 +76,9 @@ flyway-digital/
 
 ## 🔧 最近修改的文件
 
-#NJ|### v1.2.9.21
-- `SqlExecutor.java`: 第334行使用 `Objects.equals()` 替代直接 `equals()` 调用
+### v1.2.9.23
+- `SqlExecutor.java`: 添加 PL/SQL 块跟踪逻辑、extractKeywordAt 和 isEndOfBlock 辅助方法
+- `SqlExecutorTest.java`: 新增 6 个测试用例
 
 ---
 
@@ -75,22 +86,23 @@ flyway-digital/
 
 | 模块 | 测试数 | 状态 |
 |------|--------|------|
-| SqlExecutorTest | 11 | ✅ 通过 |
+| SqlExecutorTest | 17 | ✅ 通过 |
 | H2IntegrationTest | 4 | ✅ 通过 |
 | H2IntegrationComprehensiveTest | 5 | ✅ 通过 |
 | MigrationVersionTest | 9 | ✅ 通过 |
 | FileSystemScannerTest | 7 | ✅ 通过 |
 | MigrationFileParserTest | 14 | ✅ 通过 |
 | ChecksumCalculatorTest | 6 | ✅ 通过 |
-| **总计** | **56** | **✅ 全部通过** |
+| **总计** | **62** | **✅ 全部通过** |
 
 ---
 
 ## 🚨 已知问题
 
 ### 已修复
-#MH|- ✅ SqlExecutor 语法错误修复 (v1.2.9.21)
-#RR|- ✅ SqlExecutor NPE 问题 (v1.2.9.14)
+- ✅ PL/SQL 块支持 (v1.2.9.23)
+- ✅ SqlExecutor 语法错误修复 (v1.2.9.21)
+- ✅ SqlExecutor NPE 问题 (v1.2.9.14)
 - ✅ 跨数据库 SQL 执行后未切回默认数据库问题 (v1.2.9.3)
 - ✅ 反引号格式 SQL 执行问题 (v1.2.9.1)
 - ✅ 库名.表名格式 SQL 执行问题 (v1.2.9)
@@ -118,4 +130,4 @@ flyway-digital/
 
 ---
 
-#HR|**状态**: ✅ 项目稳定，v1.2.9.21 已发布到 Maven 仓库
+**状态**: ✅ 项目稳定，v1.2.9.23 已发布到 Maven 仓库
