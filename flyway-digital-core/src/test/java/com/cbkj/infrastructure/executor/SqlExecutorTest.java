@@ -334,4 +334,62 @@ public class SqlExecutorTest {
         assertTrue("应包含列名", result[0].contains("END_COL"));
     }
 
+    // ==================== Dameng Database Transaction Tests ====================
+    
+    @Test
+    public void testIsDamengDatabaseMethodExists() throws Exception {
+        // Verifies that the method exists and can be accessed
+        org.h2.jdbcx.JdbcDataSource ds = new org.h2.jdbcx.JdbcDataSource();
+        ds.setURL("jdbc:h2:mem:test;MODE=MYSQL");
+        SqlExecutor executor = new SqlExecutor(ds);
+        
+        java.lang.reflect.Method isDamengMethod = SqlExecutor.class.getDeclaredMethod("isDamengDatabase", java.sql.Connection.class);
+        assertNotNull("Method isDamengDatabase should exist", isDamengMethod);
+    }
+    
+    @Test
+    public void testSetManualCommitModeMethodExists() throws Exception {
+        // Verifies that the method exists and can be accessed
+        org.h2.jdbcx.JdbcDataSource ds = new org.h2.jdbcx.JdbcDataSource();
+        ds.setURL("jdbc:h2:mem:test;MODE=MYSQL");
+        SqlExecutor executor = new SqlExecutor(ds);
+        
+        java.lang.reflect.Method method = SqlExecutor.class.getDeclaredMethod("setManualCommitMode", java.sql.Connection.class);
+        assertNotNull("Method setManualCommitMode should exist", method);
+    }
+    
+    @Test
+    public void testCommitTransactionMethodExists() throws Exception {
+        // Verifies that the method exists and can be accessed
+        org.h2.jdbcx.JdbcDataSource ds = new org.h2.jdbcx.JdbcDataSource();
+        ds.setURL("jdbc:h2:mem:test;MODE=MYSQL");
+        SqlExecutor executor = new SqlExecutor(ds);
+        
+        java.lang.reflect.Method method = SqlExecutor.class.getDeclaredMethod("commitTransaction", java.sql.Connection.class);
+        assertNotNull("Method commitTransaction should exist", method);
+    }
+    
+    @Test
+    public void testRollbackTransactionMethodExists() throws Exception {
+        // Verifies that the method exists and can be accessed
+        org.h2.jdbcx.JdbcDataSource ds = new org.h2.jdbcx.JdbcDataSource();
+        ds.setURL("jdbc:h2:mem:test;MODE=MYSQL");
+        SqlExecutor executor = new SqlExecutor(ds);
+        
+        java.lang.reflect.Method method = SqlExecutor.class.getDeclaredMethod("rollbackTransaction", java.sql.Connection.class);
+        assertNotNull("Method rollbackTransaction should exist", method);
+    }
+    
+    @Test
+    public void testRestoreAutoCommitModeMethodExists() throws Exception {
+        // Verifies that the method exists and can be accessed
+        org.h2.jdbcx.JdbcDataSource ds = new org.h2.jdbcx.JdbcDataSource();
+        ds.setURL("jdbc:h2:mem:test;MODE=MYSQL");
+        SqlExecutor executor = new SqlExecutor(ds);
+        
+        java.lang.reflect.Method method = SqlExecutor.class.getDeclaredMethod("restoreAutoCommitMode", java.sql.Connection.class, boolean.class);
+        assertNotNull("Method restoreAutoCommitMode should exist", method);
+    }
+
+
 }

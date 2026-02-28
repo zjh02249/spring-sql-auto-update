@@ -1,12 +1,12 @@
 # 轻量级、Flyway-Compatible SQL 迁移工具
 
-Flyway-Digital 是一个轻量级、与 Flyway 兼容�?SQL 数据库迁移工具，专为简化数据库版本管理而设计�?
-## 特�?
-- **轻量�?*: 仅依�?JDBC，无其他外部依赖
+Flyway-Digital 是一个轻量级、与 Flyway 兼容�?SQL 数据库迁移工具，专为简化数据库版本管理而设计�?
+## 特�?
+- **轻量�?*: 仅依�?JDBC，无其他外部依赖
 - **Flyway 兼容**: History 表结构与 Flyway 保持一致，便于迁移
-- **Spring Boot 集成**: 提供 Starter，自动配置，开箱即�?- **多数据库支持**: 不绑定特定数据库，支�?MySQL、PostgreSQL、Oracle、达梦、海量等
-- **Java 8+**: 支持 Java 8 及更高版�?
-## 快速开�?
+- **Spring Boot 集成**: 提供 Starter，自动配置，开箱即�?- **多数据库支持**: 不绑定特定数据库，支�?MySQL、PostgreSQL、Oracle、达梦、海量等
+- **Java 8+**: 支持 Java 8 及更高版�?
+## 快速开�?
 ### Spring Boot 项目
 
 1. 添加依赖
@@ -15,7 +15,7 @@ Flyway-Digital 是一个轻量级、与 Flyway 兼容�?SQL 数据库迁移工�
 <dependency>
     <groupId>com.cbkj.infrastructure</groupId>
     <artifactId>flyway-digital-spring-boot-starter</artifactId>
-    <version>1.2.9.3</version>
+    <version>1.3.0</version>
 </dependency>
 
 ```
@@ -33,7 +33,7 @@ flyway-digital:
 
 3. 创建 SQL 迁移文件
 
-�?`src/main/resources/db/migration` 目录下创�?SQL 文件�?
+�?`src/main/resources/db/migration` 目录下创�?SQL 文件�?
 ```sql
 -- V1.0.0__init_schema.sql
 CREATE TABLE users (
@@ -49,7 +49,7 @@ CREATE INDEX idx_username ON users(username);
 
 4. 启动应用
 
-应用启动时会自动执行数据库迁移�?
+应用启动时会自动执行数据库迁移�?
 ### 独立使用
 
 ```java
@@ -75,8 +75,8 @@ public class Main {
 }
 ```
 
-## 配置�?
-| 配置�?| 默认�?| 说明 |
+## 配置�?
+| 配置�?| 默认�?| 说明 |
 |--------|--------|------|
 | `flyway-digital.enabled` | `true` | 是否启用迁移 |
 | `flyway-digital.locations` | `classpath:db/migration` | SQL文件位置，多个路径用逗号分隔 |
@@ -88,25 +88,25 @@ public class Main {
 
 ## SQL 文件命名规范
 
-所有迁�?SQL 文件必须遵循以下命名规则�?
+所有迁�?SQL 文件必须遵循以下命名规则�?
 ```
 V{version}__{description}.sql
 ```
 
-**示例�?*
+**示例�?*
 - `V1.0.0__init_schema.sql`
 - `V1.0.1__add_user_index.sql`
 - `V2.0.0.3__update_table.sql`
 
-**version 规则�?*
+**version 规则�?*
 - 仅允许数字与 `.` 组成
-- 支持多段版本号（�?`2.0.0.3`�?- 采用语义版本排序（逐段数字比较，非字符串排序）
+- 支持多段版本号（�?`2.0.0.3`�?- 采用语义版本排序（逐段数字比较，非字符串排序）
 
-**description 规则�?*
-- 位于 `__` �?`.sql` 之间
-- `_` 在写�?history 表时转为空格
+**description 规则�?*
+- 位于 `__` �?`.sql` 之间
+- `_` 在写�?history 表时转为空格
 
-## History 表结�?
+## History 表结�?
 ```sql
 CREATE TABLE flyway_digital_history (
     installed_rank INT NOT NULL,
@@ -126,32 +126,32 @@ CREATE TABLE flyway_digital_history (
 
 ## 日志格式
 
-迁移工具会输出以下格式的日志�?
+迁移工具会输出以下格式的日志�?
 ```
 [SqlExecutor] [PATH:{script_name}] [TIME:{timestamp}] [SQL:START] Executing script: {script_name}
 [SqlExecutor] [PATH:{script_name}] [TIME:{timestamp}] [SQL:SUCCESS] Script executed successfully in {time}ms
 [SqlExecutor] [PATH:{script_name}] [TIME:{timestamp}] [SQL:FAILED] Script execution failed after {time}ms: {error_message}
 ```
 
-## 版本兼容�?
+## 版本兼容�?
 - Java 8+
 - Spring Boot 2.x / 3.x
 - JDBC 4.0+
 
 ## 支持的数据库
 
-理论上支持所有标准JDBC数据库，包括但不限于�?- MySQL
+理论上支持所有标准JDBC数据库，包括但不限于�?- MySQL
 - PostgreSQL
 - Oracle
 - SQL Server
 - H2
-- 达梦数据�?- 海量数据�?- 其他国产数据�?
-## 许可�?
+- 达梦数据�?- 海量数据�?- 其他国产数据�?
+## 许可�?
 Apache License 2.0
 
 ## 贡献
 
-欢迎提交 Issue �?Pull Request�?
+欢迎提交 Issue �?Pull Request�?
 ## 联系方式
 
-如有问题，请通过 GitHub Issues 联系我们�?
+如有问题，请通过 GitHub Issues 联系我们�?
