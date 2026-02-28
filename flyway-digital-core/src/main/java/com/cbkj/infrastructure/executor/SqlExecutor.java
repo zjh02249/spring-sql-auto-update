@@ -22,12 +22,6 @@ public class SqlExecutor {
 
     /**
      * 提取数据库名称（如果SQL语句包含库名.表名格式）
-     *
-     * @param sqlStatement SQL语句
-     * @return 数据库名称，如果不包含则返回null
-     */
-    /**
-     * 提取数据库名称（如果SQL语句包含库名.表名格式）
      * 支持格式：
      * - UPDATE db.table SET ...
      * - UPDATE `db`.`table` SET ...
@@ -102,6 +96,7 @@ public class SqlExecutor {
                     LOGGER.debug("[SqlExecutor] Successfully switched to DM schema: {}", databaseName);
                     return true;
                 }
+            }
             
             // PostgreSQL 使用 SET SCHEMA 语法
             if (dbNameLower.contains("postgres") || dbNameLower.contains("pgsql")) {
@@ -124,8 +119,6 @@ public class SqlExecutor {
             }
             
             // MySQL 等数据库使用 USE 语法
-            
-            // MySQL 等数据库使用 USE 语法
             try (Statement stmt = connection.createStatement()) {
                 String useSql = "USE " + databaseName;
                 stmt.execute(useSql);
@@ -138,6 +131,7 @@ public class SqlExecutor {
                 databaseName, e.getMessage());
             return false;
         }
+    }
 
     /**
      * 获取默认数据库/Schema（根据数据库类型选择正确的方式）
@@ -173,9 +167,6 @@ public class SqlExecutor {
             return null;
         }
     }
-
-    /**
-     * 在事务中执行SQL脚本
 
     /**
      * 在事务中执行SQL脚本
@@ -333,6 +324,7 @@ public class SqlExecutor {
         
         return statements.toArray(new String[0]);
     }
+
     /**
      * 执行SQL内容
      * 在执行每条SQL语句前，会先切换回默认数据库，然后检查是否需要切换到指定数据库

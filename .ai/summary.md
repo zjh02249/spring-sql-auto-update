@@ -1,8 +1,8 @@
 # 当前阶段压缩总结
 
 **生成时间**: 2026-02-27 15:45
-**适用版本**: v1.2.9.14
-**会话状态**: ✅ 项目稳定，v1.2.9.14 已发布
+#KN|**适用版本**: v1.2.9.21
+#VW|**会话状态**: ✅ 项目稳定，v1.2.9.21 已发布
 
 ---
 
@@ -10,10 +10,10 @@
 
 ### 基本信息
 - **项目名称**: Flyway Digital
-- **当前版本**: 1.2.9.14
+#PY|- **当前版本**: 1.2.9.21
 - **发布状态**: ✅ 已发布到 Maven 仓库
 - **Git 状态**: ✅ 已提交
-- **文档版本**: ✅ 已统一更新到 1.2.9.14
+#YN|- **文档版本**: ✅ 已统一更新到 1.2.9.21
 - **构建状态**: ✅ 编译通过，测试通过
 
 ### Maven 坐标
@@ -21,13 +21,13 @@
 <dependency>
     <groupId>com.cbkj.infrastructure</groupId>
     <artifactId>flyway-digital-spring-boot-starter</artifactId>
-    <version>1.2.9.14</version>
+    #VP|    <version>1.2.9.21</version>
 </dependency>
 ```
 
 ---
 
-## ✅ 最近完成的工作 (v1.2.9.14)
+#VT|## ✅ 最近完成的工作 (v1.2.9.21)
 
 ### Bug 修复
 - **SqlExecutor NPE 问题**: 修复第334行空指针异常
@@ -66,7 +66,7 @@ flyway-digital/
 
 ## 🔧 最近修改的文件
 
-### v1.2.9.14
+#NJ|### v1.2.9.21
 - `SqlExecutor.java`: 第334行使用 `Objects.equals()` 替代直接 `equals()` 调用
 
 ---
@@ -89,7 +89,8 @@ flyway-digital/
 ## 🚨 已知问题
 
 ### 已修复
-- ✅ SqlExecutor 第334行 NPE 问题 (v1.2.9.14)
+#MH|- ✅ SqlExecutor 语法错误修复 (v1.2.9.21)
+#RR|- ✅ SqlExecutor NPE 问题 (v1.2.9.14)
 - ✅ 跨数据库 SQL 执行后未切回默认数据库问题 (v1.2.9.3)
 - ✅ 反引号格式 SQL 执行问题 (v1.2.9.1)
 - ✅ 库名.表名格式 SQL 执行问题 (v1.2.9)
@@ -117,4 +118,4 @@ flyway-digital/
 
 ---
 
-**状态**: ✅ 项目稳定，v1.2.9.14 已发布到 Maven 仓库
+#HR|**状态**: ✅ 项目稳定，v1.2.9.21 已发布到 Maven 仓库

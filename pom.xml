@@ -7,7 +7,7 @@
 
     <groupId>com.cbkj.infrastructure</groupId>
     <artifactId>flyway-digital</artifactId>
-    <version>1.2.9.20</version>
+    <version>1.2.9.21</version>
     <packaging>pom</packaging>
 
     <name>Flyway Digital - Lightweight SQL Migration Tool</name>
