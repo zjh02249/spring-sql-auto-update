@@ -1,8 +1,8 @@
 # 当前阶段压缩总结
 
 **生成时间**: 2026-02-28 16:30
-**适用版本**: v1.2.9.23
-**会话状态**: ✅ 项目稳定，v1.2.9.23 已发布
+**适用版本**: v1.3.3
+**会话状态**: ✅ 项目稳定，v1.3.3 已发布
 
 ---
 
@@ -10,10 +10,10 @@
 
 ### 基本信息
 - **项目名称**: Flyway Digital
-- **当前版本**: 1.3.0
+- **当前版本**: 1.3.3
 - **发布状态**: ✅ 已发布到 Maven 仓库
 - **Git 状态**: ✅ 已提交
-- **文档版本**: ✅ 已统一更新到 1.2.9.23
+- **文档版本**: ✅ 已统一更新到 1.3.3
 - **构建状态**: ✅ 编译通过，测试通过
 
 ### Maven 坐标
@@ -21,18 +21,20 @@
 <dependency>
     <groupId>com.cbkj.infrastructure</groupId>
     <artifactId>flyway-digital-spring-boot-starter</artifactId>
-    <version>1.2.9.23</version>
+    <version>1.3.3</version>
 </dependency>
 ```
 
 ---
 
-## ✅ 最近完成的工作 (v1.2.9.23)
+## ✅ 最近完成的工作 (v1.3.3)
 
-### PL/SQL 块支持修复
-- **达梦数据库 PL/SQL 块支持**: 修复 DECLARE...BEGIN...END 块被错误分割的问题
-  - 问题: PL/SQL 块内部分号导致 SQL 被错误分割
-  - 修复: 添加 PL/SQL 块跟踪机制，正确识别块边界
+### SQL 执行器事务管理优化
+- **移除达梦数据库手动SET AUTOCOMMIT操作**: 原来的 SET AUTOCOMMIT SQL 手动操作在某些数据库上失效
+  - 问题: 达梦数据库无法通过手动执行 SET AUTOCOMMIT ON/OFF 进行事务管理
+  - 修复: 改为标准 JDBC `Connection.setAutoCommit(false/true)` 进行事务管理
+  - 影响: 提升跨数据库事务管理的兼容性和可靠性
+
   - 影响: 支持达梦、Oracle 等数据库的 PL/SQL 匿名块
 
 ### 新增功能

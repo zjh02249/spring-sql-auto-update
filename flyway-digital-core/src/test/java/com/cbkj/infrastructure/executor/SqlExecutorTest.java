@@ -336,17 +336,7 @@ public class SqlExecutorTest {
 
     // ==================== Dameng Database Transaction Tests ====================
     
-    @Test
-    public void testIsDamengDatabaseMethodExists() throws Exception {
-        // Verifies that the method exists and can be accessed
-        org.h2.jdbcx.JdbcDataSource ds = new org.h2.jdbcx.JdbcDataSource();
-        ds.setURL("jdbc:h2:mem:test;MODE=MYSQL");
-        SqlExecutor executor = new SqlExecutor(ds);
-        
-        java.lang.reflect.Method isDamengMethod = SqlExecutor.class.getDeclaredMethod("isDamengDatabase", java.sql.Connection.class);
-        assertNotNull("Method isDamengDatabase should exist", isDamengMethod);
-    }
-    
+
     @Test
     public void testSetManualCommitModeMethodExists() throws Exception {
         // Verifies that the method exists and can be accessed

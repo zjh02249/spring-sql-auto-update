@@ -524,76 +524,39 @@ public class SqlExecutor {
      */
 
     /**
-     * 检查是否是达梦 (Dameng) 数据库
-     * 
-     * @param connection 数据库连接
-     * @return 是否为达梦数据库
-     */
-    private boolean isDamengDatabase(Connection connection) {
-        try {
-            String databaseProductName = connection.getMetaData().getDatabaseProductName();
-            String dbNameLower = databaseProductName != null ? databaseProductName.toLowerCase() : "";
-            return dbNameLower.contains("dm") || dbNameLower.contains("达梦");
-        } catch (SQLException e) {
-            LOGGER.warn("[SqlExecutor] Failed to detect database type: {}", e.getMessage());
-            return false;
-        }
-    }
-
-    /**
-     * 设置事务为手动提交模式（针对不同数据库类型）
-     * 对于达梦数据库，需要发送 SET AUTOCOMMIT OFF; 命令
+     * 设置事务为手动提交模式（使用标准JDBC方法）
      * 
      * @param connection 数据库链接
      * @throws SQLException SQL异常
      */
     private void setManualCommitMode(Connection connection) throws SQLException {
-        // 首先是JDBC标准方法
         connection.setAutoCommit(false);
-        
-        // 对于达梦数据库，还需要额外执行SQL命令
-        if (isDamengDatabase(connection)) {
-            try (Statement stmt = connection.createStatement()) {
-                stmt.execute("SET AUTOCOMMIT OFF");
-                LOGGER.debug("[SqlExecutor] Executed SET AUTOCOMMIT OFF for Dameng database");
-            }
-        }
     }
 
     /**
-     * 提交事务（针对不同数据库类型）
+     * 提交事务
      * 
      * @param connection 数据库链接
      * @throws SQLException SQL异常
      */
     private void commitTransaction(Connection connection) throws SQLException {
         connection.commit();
-        
-        if (isDamengDatabase(connection)) {
-            LOGGER.debug("[SqlExecutor] Committed transaction for Dameng database");
-        } else {
-            LOGGER.debug("[SqlExecutor] Committed transaction for {}", connection.getMetaData().getDatabaseProductName());
-        }
+        LOGGER.debug("[SqlExecutor] Committed transaction for {}", connection.getMetaData().getDatabaseProductName());
     }
 
     /**
-     * 回滚事务（针对不同数据库类型）
+     * 回滚事务
      * 
      * @param connection 数据库连接
      * @throws SQLException SQL异常
      */
     private void rollbackTransaction(Connection connection) throws SQLException {
         connection.rollback();
-        
-        if (isDamengDatabase(connection)) {
-            LOGGER.debug("[SqlExecutor] Rolled back transaction for Dameng database");
-        } else {
-            LOGGER.debug("[SqlExecutor] Rolled back transaction for {}", connection.getMetaData().getDatabaseProductName());
-        }
+        LOGGER.debug("[SqlExecutor] Rolled back transaction for {}", connection.getMetaData().getDatabaseProductName());
     }
 
     /**
-     * 恢复原始的自动提交模式（针对不同数据库类型）
+     * 恢复原始的自动提交模式（使用标准JDBC方法）
      * 
      * @param connection 数据库链接
      * @param originalAutoCommitMode 原始自动提交模式
@@ -601,15 +564,6 @@ public class SqlExecutor {
      */
     private void restoreAutoCommitMode(Connection connection, boolean originalAutoCommitMode) throws SQLException {
         connection.setAutoCommit(originalAutoCommitMode);
-        
-        if (isDamengDatabase(connection)) {
-            try (Statement stmt = connection.createStatement()) {
-                stmt.execute("SET AUTOCOMMIT ON");
-                LOGGER.debug("[SqlExecutor] Executed SET AUTOCOMMIT ON for Dameng database");
-            } catch (SQLException e) {
-                LOGGER.warn("[SqlExecutor] Could not execute SET AUTOCOMMIT ON for Dameng database: {}", e.getMessage());
-            }
-        }
     }
 
     public Connection getConnection() throws SQLException {

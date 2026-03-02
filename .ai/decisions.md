@@ -1015,3 +1015,83 @@ if (c == ';' && !inSingleQuote && !inDoubleQuote && !inLineComment && !inBlockCo
 
 **最后更新**: 2026-02-28
 **维护者**: cbkj
+---
+
+## ADR-016: SQL执行器事务管理优化和 v1.3.3 版本发布
+
+**日期**: 2026-03-02  
+**状态**: ✅ 已采纳 
+
+### 背景
+
+在达梦(Dameng)数据库环境中，手动设置 AUTOCOMMIT ON/OFF 语句是无效的。原有的SqlExecutor 通过手动执行 `SET AUTOCOMMIT OFF` 和 `SET AUTOCOMMIT ON` SQL语句来管理事务，这种方式在达梦等某些数据库上并不生效。
+
+### 问题分析
+
+1. 原有的 SqlExecutor 包含针对达梦数据库的特殊处理代码
+2. 手动执行 `SET AUTOCOMMIT` SQL 语句并不是标准事务管理方式
+3. 在某些数据库上（如达梦），这些手动设置无效，依赖底层JDBC驱动行为
+
+### 决策
+
+将 `setManualCommitMode`、`restoreAutoCommitMode`、`commitTransaction` 和 `rollbackTransaction` 方法改为使用标准的 JDBC `Connection.setAutoCommit()` 机制，移除所有数据库类型检测方法及相关特殊处理：
+
+```java
+// 设置手动提交模式
+private void setManualCommitMode(Connection connection) throws SQLException {
+    connection.setAutoCommit(false);
+}
+
+// 保存原状态并设置手动提交
+private void setManualCommitMode(Connection connection) throws SQLException {
+    connection.setAutoCommit(false);
+}
+
+// 提交事务
+private void commitTransaction(Connection connection) throws SQLException {
+    connection.commit();
+    LOGGER.debug("[SqlExecutor] Committed transaction for {}", connection.getMetaData().getDatabaseProductName());
+}
+
+// 回滚事务
+private void rollbackTransaction(Connection connection) throws SQLException {
+    connection.rollback();
+    LOGGER.debug("[SqlExecutor] Rolled back transaction for {}", connection.getMetaData().getDatabaseProductName());
+}
+
+// 恢复原始自动提交模式
+private void restoreAutoCommitMode(Connection connection, boolean originalAutoCommitMode) throws SQLException {
+    connection.setAutoCommit(originalAutoCommitMode);
+}
+```
+
+同时彻底移除 `isDamengDatabase()` 检测方法及其所有相关引用。
+
+### 理由
+
+1. **标准性**: 使用标准 JDBC 事务管理 API，确保跨数据库兼容性
+2. **可靠性**: 依赖底层 JDBC 驱动的事务管理模式，而非SQL语句
+3. **简化**: 消除数据库特异性代码，让代码更加简单一致
+4. **可维护性**: 减少针对特定数据库的特殊处理逻辑 
+
+### 影响
+
+- ✅ **优点**:
+  - 标准事务管理，适用于所有数据库
+  - 消除潜在的数据库特异性问题
+  - 简化代码结构
+  - 更好的兼容性和可维护性
+
+- ⚠️ **注意**:
+  - 不再通过SQL语句管理事务自动提交设置
+  - 所有数据库都使用相同的标准JDBC事务机制
+
+### 版本变更
+
+此变更作为 v1.3.3 版本发布，主要变化包括：
+- 移除了达梦数据库的手动SET AUTOCOMMIT操作
+- 简化了事务管理逻辑
+- 所有事务操作都使用标准JDBC API
+
+---
+

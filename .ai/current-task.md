@@ -8,7 +8,7 @@
 
 ## 📋 当前目标
 
-✅ **已完成**: 发布版本 1.3.0 到 Maven 仓库
+✅ **已完成**: 发布版本 1.3.3 到 Maven 仓库
 
 ---
 
@@ -16,10 +16,17 @@
 
 ### 主要任务
 
-修复 `splitSqlStatements` 方法，支持达梦数据库的 PL/SQL 匿名块（DECLARE...BEGIN...END）。
+移除SqlExecutor中达梦手动AUTOCOMMIT操作，统一使用标准JDBC事务API。
 
 ### 子任务清单
-- [x] 分析问题：PL/SQL 块内部分号导致 SQL 被错误分割
+- [x] 分析问题：达梦部分SQL手动SET AUTOCOMMIT ON/OFF不可用
+- [x] 移除SqlExecutor中isDamengDatabase方法
+- [x] 简化setManualCommitMode方法使用标准JDBC API
+- [x] 简化restoreAutoCommitMode方法使用标准JDBC API
+- [x] 更新commitTransaction和rollbackTransaction使用标准API
+- [x] 运行测试验证：核心功能测试全部通过
+- [x] 更新版本号：1.3.2 -> 1.3.3
+- [x] 发布到 Maven 仓库
 - [x] 实现 PL/SQL 块跟踪逻辑（plsqlDepth, inDeclareSection）
 - [x] 实现 extractKeywordAt 辅助方法
 - [x] 实现 isEndOfBlock 辅助方法
