@@ -5,7 +5,7 @@
 **项目名称**: Flyway Digital  
 **项目定位**: 轻量级、Flyway-Compatible SQL 数据库迁移工具  
 **创建时间**: 2026 年初  
-**当前版本**: 1.3.0
+**当前版本**: 1.3.2
 
 ### 核心问题
 
@@ -65,8 +65,17 @@ Flyway Digital 提供：
 - [x] 发布到 Maven 仓库
 - [x] 修复 SqlExecutor NPE 问题 (v1.2.9.21)
 - [x] 支持达梦数据库 PL/SQL 块 (v1.2.9.23)
+- [x] 修复历史记录可靠性问题 (v1.3.2)
+- [x] 支持语义化版本号
+- [x] 实现 CRC32 Checksum 校验
+- [x] 提供 Spring Boot Starter
+- [x] 支持动态数据源（Spring Boot 3.x）
+- [x] 修复 SQL 分割逻辑 BUG
+- [x] 发布到 Maven 仓库
+- [x] 修复 SqlExecutor NPE 问题 (v1.2.9.21)
+- [x] 支持达梦数据库 PL/SQL 块 (v1.2.9.23)
 
-### 中期目标（进行中）
+### 中期目标（继续进行）
 
 - [ ] 完善单元测试覆盖率
 - [ ] 支持更多数据库方言（可选）
@@ -145,14 +154,15 @@ flyway-digital/
 
 ## 📊 项目现状
 
-**当前版本**: 1.2.9.23
+**当前版本**: 1.3.2
+**发布状态**: ✅ 已发布到 Maven 仓库
 **发布状态**: ✅ 已发布到私有 Maven 仓库  
 **Maven 坐标**:
 ```xml
 <dependency>
     <groupId>com.cbkj.infrastructure</groupId>
     <artifactId>flyway-digital-spring-boot-starter</artifactId>
-    <version>1.2.9.23</version>
+    <version>1.3.2</version>
 </dependency>
 ```
 

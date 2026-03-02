@@ -215,6 +215,54 @@ public class FlywayDigital {
             historyRepository.save(appliedMigration);
         } catch (SQLException e) {
             LOGGER.error("[FlywayDigital] Failed to save migration history for version {}", version, e);
+            
+            // 尝使用备用方式确傈失败记求被录，特别是对于达梦(DM)等数据库
+            // 在事务回滚后可能会影响后续记录的写入
+            try {
+                // 短暂等待以确保数据库完成其内部事务清理
+                Thread.sleep(50);
+                
+                // 创建新仓库实例以获得干净的数据库连接
+                HistoryRepository freshRepo = new HistoryRepository(dataSource, config.getTable());
+                freshRepo.save(appliedMigration);
+                
+                LOGGER.info("[FlywayDigital] Success - History recording recovered for version {}" +
+                        " via backup repository instance", version);
+                
+            } catch (Exception backupException) {
+                LOGGER.error("[FlywayDigital] CRITICAL FAILURE: Both primary and backup attempts failed to record migration " +
+                        "status for version {} in history table", version);
+                LOGGER.error("[FlywayDigital] This could leave your system in an inconsistent state!");
+                
+                // 重要：如果原始SQL执行失败，而现在历史记录也失败，应该把两个问题都通知用户
+                if (executionException != null) {
+                    throw new RuntimeException(
+                        String.format(
+                            "Migration execution failed for version %s (%s) AND history recording also failed (%s). " +
+                            "Failed migration was NOT properly recorded in the history table " +
+                            "(this is critical as the failure won't be tracked for retry).", 
+                            version, executionException.getMessage(), backupException.getMessage()),
+                        executionException);  // 保留原始错误堆栈
+                } else {
+                    // 如果原始执行成功，而是历史记录本身出问题了（不太可能但保护性检查）
+                    throw new RuntimeException(
+                        String.format(
+                            "Migration succeeded but history recording failed for version %s, with error: %s. " +
+                            "The successful migration was NOT properly recorded in the history table.",
+                            version, backupException.getMessage()));
+                }
+            }
+        }
+
+        // 如果执行失败，抛出异常
+        if (executionException != null) {
+            throw new RuntimeException("Migration failed for version " + version + ": " + 
+                executionException.getMessage(), executionException);
+        }
+        try {
+            historyRepository.save(appliedMigration);
+        } catch (SQLException e) {
+            LOGGER.error("[FlywayDigital] Failed to save migration history for version {}", version, e);
         }
 
         // 如果执行失败，抛出异常
