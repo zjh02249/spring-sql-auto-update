@@ -5,6 +5,8 @@ import org.slf4j.LoggerFactory;
 
 import javax.sql.DataSource;
 import java.sql.*;
+import java.util.regex.Pattern;
+
 
 /**
  * SQL执行器
@@ -498,6 +500,22 @@ public class SqlExecutor {
                         scriptName, statementCount, currentDatabase,
                         trimmedStatement.substring(0, Math.min(100, trimmedStatement.length())));
                 
+                // 检查是否为 DDL 语句（可能导致 MySQL 事务中断）
+                String trimmedUpperStmt = trimmedStatement.toUpperCase().trim();
+                if (trimmedUpperStmt.startsWith("CREATE") || 
+                    trimmedUpperStmt.startsWith("ALTER") || 
+                    trimmedUpperStmt.startsWith("DROP") || 
+                    trimmedUpperStmt.startsWith("TRUNCATE") || 
+                    trimmedUpperStmt.startsWith("RENAME")) {
+                    
+                    String databaseProductName = connection.getMetaData().getDatabaseProductName();
+                    if (databaseProductName != null && databaseProductName.toLowerCase().contains("mysql")) {
+                        LOGGER.warn("[SqlExecutor] [PATH:{}][WARNING] DDL command ({}) detected in MySQL which causes implicit commit and prevents rollback - " +
+                                "Subsequent statements in this transaction will not be rolled back if they fail. ",
+                                scriptName, trimmedStatement.substring(0, Math.min(20, trimmedStatement.length())).replaceAll("[\\r\\n\\s]+", " "));
+                    }
+                }
+                
                 stmt.execute(trimmedStatement);
                 
                 // 重要：执行完成后立即切换回默认数据库
@@ -563,8 +581,19 @@ public class SqlExecutor {
      * @throws SQLException SQL异常
      */
     private void restoreAutoCommitMode(Connection connection, boolean originalAutoCommitMode) throws SQLException {
-        connection.setAutoCommit(originalAutoCommitMode);
+connection.setAutoCommit(originalAutoCommitMode);
+}
+
+    /**
+     * Checks if SQL statements in the content contain DDL statements that cause implicit commits in MySQL
+     * @param sqlContent the SQL content to check
+     * @return true if contains DDL statements that are problematic in MySQL, false otherwise
+     */
+    private boolean containsProblematicDdlStatements(String sqlContent) {
+        return DDL_STATEMENT_PATTERN.matcher(sqlContent).find();
     }
+
+    private static final Pattern DDL_STATEMENT_PATTERN = Pattern.compile("^\\s*(CREATE|ALTER|DROP|TRUNCATE|RENAME)\\s+", Pattern.CASE_INSENSITIVE | Pattern.MULTILINE | Pattern.COMMENTS);
 
     public Connection getConnection() throws SQLException {
         return dataSource.getConnection();

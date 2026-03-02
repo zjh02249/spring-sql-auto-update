@@ -1,8 +1,8 @@
 # 当前阶段压缩总结
 
 **生成时间**: 2026-02-28 16:30
-**适用版本**: v1.3.4
-**会话状态**: ✅ 项目稳定，v1.3.4 已发布
+**适用版本**: v1.3.5
+**会话状态**: ✅ 项目稳定，v1.3.5 已发布
 
 ---
 
@@ -10,10 +10,10 @@
 
 ### 基本信息
 - **项目名称**: Flyway Digital
-- **当前版本**: 1.3.4
+- **当前版本**: 1.3.5
 - **发布状态**: ✅ 已发布到 Maven 仓库
 - **Git 状态**: ✅ 已提交
-- **文档版本**: ✅ 已统一更新到 1.3.4
+- **文档版本**: ✅ 已统一更新到 1.3.5
 - **构建状态**: ✅ 编译通过，测试通过
 
 ### Maven 坐标
@@ -21,13 +21,20 @@
 <dependency>
     <groupId>com.cbkj.infrastructure</groupId>
     <artifactId>flyway-digital-spring-boot-starter</artifactId>
-    <version>1.3.4</version>
+    <version>1.3.5</version>
 </dependency>
 ```
 
 ---
 
-## ✅ 最近完成的工作 (v1.3.4)
+## ✅ 最近完成的工作 (v1.3.5)
+
+### MySQL 事务处理改进
+- **新增 MySQL DDL 检测机制**: 添加了对 CREATE/ALTER/DROP 等 DDL 语句的检测
+  - 问题: MySQL 会为 DDL 语句执行隐式提交，破坏事物原子性
+  - 解决方案: 检测 DDL 语句并在检测到 MySQL 时发出警告
+  - 影响: 开发人员现在可以预知事务回滚可能不会包含之前的 DDL 语句
+- **保留事务逻辑**: 保持原有的事务控制和回滚机制
 
 ### 重复插入历史记录修复
 - **修复重复保存成功记录**: 移除了 executeMigration 方法中的重复 save 调用
@@ -132,7 +139,7 @@ flyway-digital/
    - 完善 API 文档
 
 ---
-
+**状态**: ✅ 项目稳定，v1.3.5 已发布到 Maven 仓库
 ## 🔗 相关链接
 
 - **Maven 仓库**: http://maven.tcmbrain.cn/repository/maven-releases/

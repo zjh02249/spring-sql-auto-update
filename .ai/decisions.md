@@ -1096,6 +1096,76 @@ private void restoreAutoCommitMode(Connection connection, boolean originalAutoCo
 ---
 
 
+## ADR-018: MySQL DDL 检测和事务警告 (v1.3.5)
+
+**日期**: 2026-03-02  
+**状态**: ✅ 已采纳
+
+### 背景
+
+在 MySQL 数据库中，当执行 DDL（数据定义语言）语句如 `CREATE`、`ALTER`、`DROP` 等时，会触发隐式提交（implicit commit），这会自动提交当前事务，从而中断整个事务的原子性。而 PostgreSQL 等数据库则支持事务性的 DDL，可以在事务中执行并回滚。
+
+这个差异导致用户认为他们在一个事务中执行的所有 SQL 操作都能够在失败时完全回滚，但在 MySQL 中实际上可能只有 DDL 之后的操作才能被回滚，而 DDL 操作已经永久提交了。
+
+### 问题分析
+
+1. MySQL 对 DDL 语句执行隐式提交，中断当前事务   
+2. 开发者期望整个迁移脚本在一个事务中执行 
+3. 当迁移脚本失败回滚时，MySQL 用户会发现一些 DDL 已经永久保存 
+4. 这种行为差异让开发者感到困惑
+
+### 决策
+
+添加 MySQL DDL 检测机制，当在 MySQL 中发现 DDL 语句时输出警告信息，提前告知用户可能存在回滚不完整的情况。具体实现在`SqlExecutor.java`的`executeSql`方法中添加：
+
+```java
+// 检查是否为 DDL 语句（可能导致 MySQL 事务中断）
+String trimmedUpperStmt = trimmedStatement.toUpperCase().trim();
+if (trimmedUpperStmt.startsWith("CREATE") || 
+    trimmedUpperStmt.startsWith("ALTER") || 
+    trimmedUpperStmt.startsWith("DROP") || 
+    trimmedUpperStmt.startsWith("TRUNCATE") || 
+    trimmedUpperStmt.startsWith("RENAME")) {
+    String databaseProductName = connection.getMetaData().getDatabaseProductName();
+    if (databaseProductName != null && databaseProductName.toLowerCase().contains("mysql")) {
+        LOGGER.warn("[SqlExecutor] [PATH:{}][WARNING] DDL command ({}) detected in MySQL which causes implicit commit and prevents rollback - " +
+                "Subsequent statements in this transaction will not be rolled back if they fail.\",
+                scriptName, trimmedStatement);
+    }
+}
+stmt.execute(trimmedStatement);
+```
+
+### 理由
+
+1. **提高透明度**: 让开发人员明确知道在 MySQL 上 DDL 语句会影响事务行为
+2. **减少误解**: 使回滚行为更加透明和可预测
+3. **不改变核心流程**: 保持原有的事务逻辑不变
+4. **最小侵入性**: 通过警告而不是强行阻止来处理数据库差异
+
+### 影响
+
+- ✅ **正面**:
+  - 提高 MySQL 用户对事务行为预期的准确性
+  - 减少因为事务回滚不完整导致的困扰
+  - 维护跨数据库的一致性理解
+  - 保留事务系统的整体架构
+
+- 🔄 **中性**:
+  - 不会影响 PostgreSQL 等支持事务性 DDL 的数据库
+  - 保持原有事务功能运作
+  - 现有迁移脚本可以继续使用
+
+### 版本变更
+
+此变更作为 v1.3.5 版本发布，主要变化包括：
+- 添加 MySQL DDL 检测和警告机制
+- 提高开发者的事务预期透明度
+- 改进跨数据库行为可预测性
+
+---
+
+
 ## ADR-017: 修复历史记录重复插入问题 (v1.3.4)
 
 **日期**: 2026-03-02  
