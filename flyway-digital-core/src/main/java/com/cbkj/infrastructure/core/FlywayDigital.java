@@ -259,17 +259,6 @@ public class FlywayDigital {
             throw new RuntimeException("Migration failed for version " + version + ": " + 
                 executionException.getMessage(), executionException);
         }
-        try {
-            historyRepository.save(appliedMigration);
-        } catch (SQLException e) {
-            LOGGER.error("[FlywayDigital] Failed to save migration history for version {}", version, e);
-        }
-
-        // 如果执行失败，抛出异常
-        if (executionException != null) {
-            throw new RuntimeException("Migration failed for version " + version + ": " + 
-                executionException.getMessage(), executionException);
-        }
     }
 
     /**

@@ -1,8 +1,8 @@
 # 当前阶段压缩总结
 
 **生成时间**: 2026-02-28 16:30
-**适用版本**: v1.3.3
-**会话状态**: ✅ 项目稳定，v1.3.3 已发布
+**适用版本**: v1.3.4
+**会话状态**: ✅ 项目稳定，v1.3.4 已发布
 
 ---
 
@@ -10,10 +10,10 @@
 
 ### 基本信息
 - **项目名称**: Flyway Digital
-- **当前版本**: 1.3.3
+- **当前版本**: 1.3.4
 - **发布状态**: ✅ 已发布到 Maven 仓库
 - **Git 状态**: ✅ 已提交
-- **文档版本**: ✅ 已统一更新到 1.3.3
+- **文档版本**: ✅ 已统一更新到 1.3.4
 - **构建状态**: ✅ 编译通过，测试通过
 
 ### Maven 坐标
@@ -21,13 +21,21 @@
 <dependency>
     <groupId>com.cbkj.infrastructure</groupId>
     <artifactId>flyway-digital-spring-boot-starter</artifactId>
-    <version>1.3.3</version>
+    <version>1.3.4</version>
 </dependency>
 ```
 
 ---
 
-## ✅ 最近完成的工作 (v1.3.3)
+## ✅ 最近完成的工作 (v1.3.4)
+
+### 重复插入历史记录修复
+- **修复重复保存成功记录**: 移除了 executeMigration 方法中的重复 save 调用
+  - 问题: 成功的迁移脚本被执行两次到历史表导致主键冲突
+  - 修复: 删除多余的 historyRepository.save(appliedMigration) 调用
+  - 影响: 防止重复记录插入和主键冲突，维护数据完整性
+- **保留错误处理**: 保持了错误处理和重试机制
+
 
 ### SQL 执行器事务管理优化
 - **移除达梦数据库手动SET AUTOCOMMIT操作**: 原来的 SET AUTOCOMMIT SQL 手动操作在某些数据库上失效
@@ -132,4 +140,4 @@ flyway-digital/
 
 ---
 
-**状态**: ✅ 项目稳定，v1.2.9.23 已发布到 Maven 仓库
+**状态**: ✅ 项目稳定，v1.3.4 已发布到 Maven 仓库
