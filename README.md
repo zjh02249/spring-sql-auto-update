@@ -1,7 +1,15 @@
 # 轻量级、Flyway-Compatible SQL 迁移工具
 
 Flyway-Digital 是一个轻量级、与 Flyway 兼容�?SQL 数据库迁移工具，专为简化数据库版本管理而设计�?
-## 特�?
+## 特点
+
+- **轻量级**: 仅依赖JDBC，无其他外部依赖
+- **Flyway 兼容**: History 表结构与 Flyway 保持一致，便于迁移
+- **Spring Boot 集成**: 提供 Starter，自动配置，开箱即用
+- **多数据库支持**: 不绑定特定数据库，支持 MySQL、PostgreSQL、Oracle、达梦、海量等
+- **Java 8+**: 支持 Java 8 及更高版本
+
+**注意**: Oracle 和达梦、MySQL 一样：DDL（表结构相关、索引相关、视图相关、约束相关、数据库对象相关、库级操作、权限相关（很多人不知道也是 DDL）） 不能回滚，PostgreSQL 部分可以。
 - **轻量�?*: 仅依�?JDBC，无其他外部依赖
 - **Flyway 兼容**: History 表结构与 Flyway 保持一致，便于迁移
 - **Spring Boot 集成**: 提供 Starter，自动配置，开箱即�?- **多数据库支持**: 不绑定特定数据库，支�?MySQL、PostgreSQL、Oracle、达梦、海量等
@@ -145,8 +153,13 @@ CREATE TABLE flyway_digital_history (
 - Oracle
 - SQL Server
 - H2
-- 达梦数据�?- 海量数据�?- 其他国产数据�?
-## 许可�?
+- 达梦数据库
+- 海量数据库
+- 其他国产数据库
+
+**特别提醒**: Oracle 和达梦数据库与 MySQL 类似：DDL语句（包括表结构相关、索引相关、视图相关、约束相关、数据库对象相关、库级操作、权限相关等命令 - 所有这些很多开发人员不知道也属于 DDL 语句）执行后无法回滚；而 PostgreSQL 对部分 DDL 操作提供了事务性支持，可在事务中执行和回滚。
+
+## 许可证
 Apache License 2.0
 
 ## 贡献
