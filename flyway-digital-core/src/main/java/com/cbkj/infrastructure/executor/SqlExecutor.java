@@ -91,32 +91,80 @@ public class SqlExecutor {
             String dbNameLower = databaseProductName != null ? databaseProductName.toLowerCase() : "";
             
             // 达梦数据库使用 SET SCHEMA 语法
+            // 使用 SAVEPOINT 机制来隔离可能失败的 SET SCHEMA 命令
             if (dbNameLower.contains("dm") || dbNameLower.contains("达梦")) {
                 try (Statement stmt = connection.createStatement()) {
-                    String useSql = "SET SCHEMA " + databaseName;
-                    stmt.execute(useSql);
-                    LOGGER.debug("[SqlExecutor] Successfully switched to DM schema: {}", databaseName);
-                    return true;
+                    stmt.execute("SAVEPOINT before_schema_switch");
+                    try {
+                        String useSql = "SET SCHEMA " + databaseName;
+                        stmt.execute(useSql);
+                        stmt.execute("RELEASE SAVEPOINT before_schema_switch");
+                        LOGGER.debug("[SqlExecutor] Successfully switched to DM schema: {}", databaseName);
+                        return true;
+                    } catch (SQLException e) {
+                        try {
+                            stmt.execute("ROLLBACK TO SAVEPOINT before_schema_switch");
+                        } catch (SQLException ex) {
+                            LOGGER.warn("[SqlExecutor] Failed to rollback to savepoint: {}", ex.getMessage());
+                        }
+                        LOGGER.debug("[SqlExecutor] Failed to switch to DM schema '{}': {}. Will try to execute SQL as-is.",
+                            databaseName, e.getMessage());
+                        return false;
+                    }
                 }
             }
             
             // PostgreSQL 使用 SET SCHEMA 语法
+            // 使用 SAVEPOINT 机制来隔离可能失败的 SET SCHEMA 命令
+            // 避免事务进入 aborted 状态导致后续 SQL 执行失败
             if (dbNameLower.contains("postgres") || dbNameLower.contains("pgsql")) {
                 try (Statement stmt = connection.createStatement()) {
-                    String useSql = "SET SCHEMA " + databaseName;
-                    stmt.execute(useSql);
-                    LOGGER.debug("[SqlExecutor] Successfully switched to PostgreSQL schema: {}", databaseName);
-                    return true;
+                    // 创建 SAVEPOINT 来保护后续的 SET SCHEMA 操作
+                    stmt.execute("SAVEPOINT before_schema_switch");
+                    try {
+                        String useSql = "SET SCHEMA " + databaseName;
+                        stmt.execute(useSql);
+                        // 释放 SAVEPOINT，提交这个操作
+                        stmt.execute("RELEASE SAVEPOINT before_schema_switch");
+                        LOGGER.debug("[SqlExecutor] Successfully switched to PostgreSQL schema: {}", databaseName);
+                        return true;
+                    } catch (SQLException e) {
+                        // SET SCHEMA 失败，回滚到 SAVEPOINT 来恢复事务状态
+                        // 这样可以避免事务进入 aborted 状态
+                        try {
+                            stmt.execute("ROLLBACK TO SAVEPOINT before_schema_switch");
+                            LOGGER.debug("[SqlExecutor] Rolled back failed SAVEPOINT for schema switch");
+                        } catch (SQLException ex) {
+                            LOGGER.warn("[SqlExecutor] Failed to rollback to savepoint: {}", ex.getMessage());
+                        }
+                        LOGGER.debug("[SqlExecutor] Failed to switch to PostgreSQL schema '{}': {}. Will try to execute SQL as-is.",
+                            databaseName, e.getMessage());
+                        return false;
+                    }
                 }
             }
             
             // Oracle 使用 ALTER SESSION SET CURRENT_SCHEMA 语法
+            // 使用 SAVEPOINT 机制来隔离可能失败的命令
             if (dbNameLower.contains("oracle")) {
                 try (Statement stmt = connection.createStatement()) {
-                    String useSql = "ALTER SESSION SET CURRENT_SCHEMA = " + databaseName;
-                    stmt.execute(useSql);
-                    LOGGER.debug("[SqlExecutor] Successfully switched to Oracle schema: {}", databaseName);
-                    return true;
+                    stmt.execute("SAVEPOINT before_schema_switch");
+                    try {
+                        String useSql = "ALTER SESSION SET CURRENT_SCHEMA = " + databaseName;
+                        stmt.execute(useSql);
+                        stmt.execute("RELEASE SAVEPOINT before_schema_switch");
+                        LOGGER.debug("[SqlExecutor] Successfully switched to Oracle schema: {}", databaseName);
+                        return true;
+                    } catch (SQLException e) {
+                        try {
+                            stmt.execute("ROLLBACK TO SAVEPOINT before_schema_switch");
+                        } catch (SQLException ex) {
+                            LOGGER.warn("[SqlExecutor] Failed to rollback to savepoint: {}", ex.getMessage());
+                        }
+                        LOGGER.debug("[SqlExecutor] Failed to switch to Oracle schema '{}': {}. Will try to execute SQL as-is.",
+                            databaseName, e.getMessage());
+                        return false;
+                    }
                 }
             }
             
