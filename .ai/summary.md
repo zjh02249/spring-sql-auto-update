@@ -1,8 +1,8 @@
 # 当前阶段压缩总结
 
-**生成时间**: 2026-02-28 16:30
-**适用版本**: v1.3.5
-**会话状态**: ✅ 项目稳定，v1.3.5 已发布
+**生成时间**: 2026-03-05 14:00
+**适用版本**: v1.3.6
+**会话状态**: ✅ 项目稳定，v1.3.6 已发布
 
 ---
 
@@ -10,10 +10,10 @@
 
 ### 基本信息
 - **项目名称**: Flyway Digital
-- **当前版本**: 1.3.5
+- **当前版本**: 1.3.6
 - **发布状态**: ✅ 已发布到 Maven 仓库
-- **Git 状态**: ✅ 已提交
-- **文档版本**: ✅ 已统一更新到 1.3.5
+- **Git 状态**: ✅ 待提交
+- **文档版本**: ✅ 已统一更新到 1.3.6
 - **构建状态**: ✅ 编译通过，测试通过
 
 ### Maven 坐标
@@ -21,51 +21,32 @@
 <dependency>
     <groupId>com.cbkj.infrastructure</groupId>
     <artifactId>flyway-digital-spring-boot-starter</artifactId>
-    <version>1.3.5</version>
+    <version>1.3.6</version>
 </dependency>
 ```
 
 ---
 
-## ✅ 最近完成的工作 (v1.3.5)
+## ✅ 最近完成的工作 (v1.3.6)
 
-### MySQL 事务处理改进
-- **新增 MySQL DDL 检测机制**: 添加了对 CREATE/ALTER/DROP 等 DDL 语句的检测
-  - 问题: MySQL 会为 DDL 语句执行隐式提交，破坏事物原子性
-  - 解决方案: 检测 DDL 语句并在检测到 MySQL 时发出警告
-  - 影响: 开发人员现在可以预知事务回滚可能不会包含之前的 DDL 语句
-- **保留事务逻辑**: 保持原有的事务控制和回滚机制
+### 版本号递增和维护
+- **版本号更新**: 从 1.3.5 升级到 1.3.6
+  - 更新所有 pom.xml 文件中的版本号
+  - 更新 README.md 和文档中的版本号
+  - 更新 .ai 目录下所有文档的版本号
+  
+- **Maven 发布**: 成功发布核心模块到 Maven 仓库
+  - flyway-digital-core-1.3.6
+  - flyway-digital-spring-boot-starter-1.3.6
 
-### 重复插入历史记录修复
-- **修复重复保存成功记录**: 移除了 executeMigration 方法中的重复 save 调用
-  - 问题: 成功的迁移脚本被执行两次到历史表导致主键冲突
-  - 修复: 删除多余的 historyRepository.save(appliedMigration) 调用
-  - 影响: 防止重复记录插入和主键冲突，维护数据完整性
-- **保留错误处理**: 保持了错误处理和重试机制
-
-
-### SQL 执行器事务管理优化
-- **移除达梦数据库手动SET AUTOCOMMIT操作**: 原来的 SET AUTOCOMMIT SQL 手动操作在某些数据库上失效
-  - 问题: 达梦数据库无法通过手动执行 SET AUTOCOMMIT ON/OFF 进行事务管理
-  - 修复: 改为标准 JDBC `Connection.setAutoCommit(false/true)` 进行事务管理
-  - 影响: 提升跨数据库事务管理的兼容性和可靠性
-
-  - 影响: 支持达梦、Oracle 等数据库的 PL/SQL 匿名块
-
-### 新增功能
-- **extractKeywordAt 辅助方法**: 从指定位置提取 SQL 关键字（支持单词边界匹配）
-- **isEndOfBlock 辅助方法**: 区分块结束符 (END;) 与控制结构 (END IF/LOOP)
-- **PL/SQL 块跟踪**: 使用 plsqlDepth 和 inDeclareSection 跟踪块嵌套
-
-### 测试验证
-- ✅ 所有 62 个单元测试通过（原有 56 + 新增 6）
-- ✅ 新增测试覆盖:
-  - 基本 DECLARE...BEGIN...END 块
-  - 完整达梦数据库场景
-  - 混合普通 SQL 和 DECLARE 块
-  - 独立 BEGIN...END 块
-  - 嵌套 BEGIN...END 块
-  - 列名包含关键字的情况
+- **测试验证**: 66个测试全部通过
+  - SqlExecutorTest: 21个测试
+  - H2IntegrationTest: 4个测试
+  - H2IntegrationComprehensiveTest: 5个测试
+  - MigrationVersionTest: 9个测试
+  - FileSystemScannerTest: 7个测试
+  - MigrationFileParserTest: 14个测试
+  - ChecksumCalculatorTest: 6个测试
 
 ---
 
@@ -73,29 +54,21 @@
 
 ```
 flyway-digital/
-├── flyway-digital-core/              # 核心模块（已发布）
+├── flyway-digital-core/              # 核心模块（已发布 v1.3.6）
 │   ├── core/                          # 核心迁移引擎
 │   ├── executor/                      # SQL 执行器
 │   ├── scanner/                       # SQL 文件扫描器
 │   ├── history/                       # 迁移历史管理
 │   └── model/                         # 领域模型
 │
-├── flyway-digital-spring-boot-starter/ # Spring Boot Starter（已发布）
+├── flyway-digital-spring-boot-starter/ # Spring Boot Starter（已发布 v1.3.6）
 │   ├── autoconfigure/                 # 自动配置
 │   └── META-INF/spring/               # Spring Boot 配置
 │
 └── flyway-digital-samples/            # 示例（不发布）
-    ├── spring-boot-sample/              # Spring Boot 示例
+    ├── spring-boot-sample/            # Spring Boot 示例
     └── standalone-sample/             # 独立使用示例
 ```
-
----
-
-## 🔧 最近修改的文件
-
-### v1.2.9.23
-- `SqlExecutor.java`: 添加 PL/SQL 块跟踪逻辑、extractKeywordAt 和 isEndOfBlock 辅助方法
-- `SqlExecutorTest.java`: 新增 6 个测试用例
 
 ---
 
@@ -103,14 +76,14 @@ flyway-digital/
 
 | 模块 | 测试数 | 状态 |
 |------|--------|------|
-| SqlExecutorTest | 17 | ✅ 通过 |
+| SqlExecutorTest | 21 | ✅ 通过 |
 | H2IntegrationTest | 4 | ✅ 通过 |
 | H2IntegrationComprehensiveTest | 5 | ✅ 通过 |
 | MigrationVersionTest | 9 | ✅ 通过 |
 | FileSystemScannerTest | 7 | ✅ 通过 |
 | MigrationFileParserTest | 14 | ✅ 通过 |
 | ChecksumCalculatorTest | 6 | ✅ 通过 |
-| **总计** | **62** | **✅ 全部通过** |
+| **总计** | **66** | **✅ 全部通过** |
 
 ---
 
@@ -123,6 +96,9 @@ flyway-digital/
 - ✅ 跨数据库 SQL 执行后未切回默认数据库问题 (v1.2.9.3)
 - ✅ 反引号格式 SQL 执行问题 (v1.2.9.1)
 - ✅ 库名.表名格式 SQL 执行问题 (v1.2.9)
+- ✅ MySQL DDL 检测和警告 (v1.3.5)
+- ✅ 历史记录重复插入问题 (v1.3.4)
+- ✅ 达梦数据库事务管理优化 (v1.3.3)
 
 ---
 
@@ -139,7 +115,9 @@ flyway-digital/
    - 完善 API 文档
 
 ---
-**状态**: ✅ 项目稳定，v1.3.5 已发布到 Maven 仓库
+
+**状态**: ✅ 项目稳定，v1.3.6 已发布到 Maven 仓库
+
 ## 🔗 相关链接
 
 - **Maven 仓库**: http://maven.tcmbrain.cn/repository/maven-releases/
@@ -147,4 +125,5 @@ flyway-digital/
 
 ---
 
-**状态**: ✅ 项目稳定，v1.3.4 已发布到 Maven 仓库
+**最后更新**: 2026-03-05
+**维护者**: cbkj
