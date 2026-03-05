@@ -23,7 +23,7 @@ Flyway-Digital 是一个轻量级、与 Flyway 兼容�?SQL 数据库迁移工�
 <dependency>
     <groupId>com.cbkj.infrastructure</groupId>
     <artifactId>flyway-digital-spring-boot-starter</artifactId>
-    <version>1.3.0</version>
+    <version>1.3.6</version>
 </dependency>
 
 ```
