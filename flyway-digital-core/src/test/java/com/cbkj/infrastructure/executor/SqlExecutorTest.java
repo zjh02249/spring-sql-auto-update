@@ -396,7 +396,7 @@ public class SqlExecutorTest {
         assertTrue("应包含列名", result[0].contains("END_COL"));
     }
 
-    // ==================== Dameng Database Transaction Tests ====================
+    // ==================== 达梦数据库事务相关测试 ====================
     
 
     @Test
