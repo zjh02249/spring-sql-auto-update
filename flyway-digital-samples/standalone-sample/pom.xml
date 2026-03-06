@@ -8,7 +8,7 @@
     <parent>
         <groupId>com.cbkj.infrastructure</groupId>
         <artifactId>flyway-digital-samples</artifactId>
-        <version>1.3.6</version>
+        <version>1.3.6.1</version>
     </parent>
 
     <artifactId>standalone-sample</artifactId>
@@ -93,7 +93,7 @@
         </plugins>
     </build>
 
-    <!-- 继承父项目的发布配置 -->
+    <!-- 缁ф壙鐖堕」鐩殑鍙戝竷閰嶇疆 -->
     <distributionManagement>
         <repository>
             <id>maven-releases</id>

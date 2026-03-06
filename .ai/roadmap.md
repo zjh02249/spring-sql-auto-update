@@ -1,175 +1,24 @@
-# 项目路线图
+# Roadmap
 
-**项目**: Flyway Digital  
-**最后更新**: 2026-02-27  
-**当前版本**: 1.3.6
+Last Updated: 2026-03-06
+Current Version: 1.3.6.1
 
----
+## Completed
+- Core migration engine available and stable.
+- Spring Boot starter integration complete.
+- Dynamic datasource support complete.
+- SqlExecutor namespace-restore fix and safety enhancement released in 1.3.6.1.
 
-## 🎯 总体目标
+## Near-Term
+1. Add more integration tests for cross-dialect namespace behaviors.
+2. Review identifier validation strategy against real production naming conventions.
+3. Continue coverage improvement and execution path hardening.
 
-构建一个轻量级、Flyway 兼容的 SQL 数据库迁移工具，支持国产数据库，易于集成和部署。
+## Mid-Term
+1. Optional CLI improvements.
+2. More operational diagnostics and migration observability.
+3. Additional docs for edge-case SQL scripts.
 
----
-
-## 📅 阶段规划
-
-### ✅ 第一阶段：核心功能实现（已完成）
-
-**时间**: 2026-01 - 2026-02  
-**目标**: 实现基础迁移功能，发布可用版本
-
-#### 已完成工作
-
-##### 核心功能
-- [x] SQL 文件扫描和解析
-- [x] 语义化版本号支持 (1.0.0, 1.0.0.3 等)
-- [x] CRC32 Checksum 校验
-- [x] 迁移历史管理 (History 表)
-- [x] 事务控制 (每个 SQL 文件一个事务)
-
-##### Spring Boot 集成
-- [x] Spring Boot Starter 自动配置
-- [x] 配置属性绑定 (FlywayDigitalProperties)
-- [x] Spring Boot 2.x / 3.x 双版本兼容
-- [x] 动态数据源支持
-
-##### 多数据库支持
-- [x] MySQL / MariaDB
-- [x] PostgreSQL
-- [x] Oracle
-- [x] H2 (测试用)
-- [x] 达梦数据库 (DM)
-- [x] 其他国产数据库
-
-##### Bug 修复 (按时间顺序)
-- [x] v1.2.9: 修复库名.表名格式 SQL 执行问题
-- [x] v1.2.9.1: 修复反引号格式 SQL 执行问题
-- [x] v1.2.9.3: 修复跨数据库 SQL 执行后未切回默认数据库问题
-- [x] v1.2.9.4: 修复 SQL 执行失败后重复插入历史记录问题
-#TS|- [x] v1.2.9.21: 修复 SqlExecutor 语法错误
-
-#### 里程碑
-- ✅ **v1.0.0**: 基础功能完成
-- ✅ **v1.2.0**: Spring Boot Starter 发布
-- ✅ **v1.2.7**: 首次 Maven 仓库发布
-#ZV|- ✅ **v1.2.9.21**: 语法错误修复，项目稳定
-
----
-
-### 🔄 第二阶段：完善和优化（进行中）
-
-**时间**: 2026-02 - 2026-03  
-**目标**: 提升测试覆盖率，完善文档，优化性能
-
-#### 计划工作
-
-##### 测试覆盖
-- [ ] 单元测试覆盖率提升至 80%+
-- [ ] 添加更多边界条件测试
-- [ ] 添加性能测试
-- [ ] 集成测试覆盖更多数据库
-
-##### 文档完善
-- [ ] 编写用户指南
-- [ ] 编写开发者文档
-- [ ] 添加更多使用示例
-- [ ] 完善 API 文档 (Javadoc)
-
-##### 性能优化
-- [ ] SQL 文件扫描性能优化
-- [ ] 大数据量迁移性能测试
-- [ ] 内存使用优化
-
-#### 里程碑
-- 🎯 **v1.3.0**: 测试覆盖率达到 80%，文档完善
-- 🎯 **v1.4.0**: 性能优化完成
-
----
-
-### ⏳ 第三阶段：高级功能（规划中）
-
-**时间**: 2026-03 - 2026-04  
-**目标**: 添加高级功能，提升工具实用性
-
-#### 计划工作
-
-##### 功能增强
-- [ ] Baseline-on-migrate 增强
-- [ ] 迁移回滚功能 (需谨慎设计)
-- [ ] 迁移钩子 (Before/After callbacks)
-- [ ] 并行迁移支持 (多个数据库同时迁移)
-
-##### 工具链
-- [ ] CLI 工具 (命令行界面)
-- [ ] Gradle Plugin
-- [ ] Maven Plugin
-
-##### 监控和可观测性
-- [ ] 迁移报告生成
-- [ ] 迁移指标收集 (Micrometer)
-- [ ] 健康检查端点 (Spring Boot Actuator)
-
-#### 里程碑
-- 🎯 **v2.0.0**: 高级功能完成，工具链完善
-
----
-
-### 🔮 第四阶段：生态建设（远期规划）
-
-**时间**: 2026-04 以后  
-**目标**: 建设工具生态，提升影响力
-
-#### 计划工作
-
-##### 社区建设
-- [ ] 开源社区建设
-- [ ] 贡献者指南
-- [ ] Issue 和 PR 管理流程
-- [ ] 定期发布计划
-
-##### 生态集成
-- [ ] 与主流框架集成 (Spring Boot 官方支持)
-- [ ] 与云平台集成 (Kubernetes Operator)
-- [ ] 与 CI/CD 工具集成 (Jenkins, GitLab CI)
-
-##### 企业级特性
-- [ ] 企业级安全审计
-- [ ] 多租户支持
-- [ ] 分布式迁移协调
-
-#### 里程碑
-- 🎯 **v3.0.0**: 生态建设完成，成为主流迁移工具
-
----
-
-## 📊 当前状态
-
-**当前状态**: ✅ v1.3.2 已发布，第三阶段进行中
-
-### 已完成
-- ✅ 核心迁移功能
-- ✅ Spring Boot 集成
-- ✅ 多数据库支持
-- ✅ 基础文档
-- ✅ Maven 仓库发布
-- ✅ NPE 问题修复
-
-### 进行中
-- 🔄 测试覆盖率提升 (当前 ~60%)
-- 🔄 文档完善
-
-### 待开始
-- ⏳ 性能优化
-- ⏳ 高级功能
-- ⏳ 工具链
-
----
-
-## 📝 更新日志
-
-| 2026-02-28 | v1.2.9.23 | 支持达梦数据库 PL/SQL 块 |
-| 2026-02-28 | v1.2.9.21 | 修复 SqlExecutor 语法错误 |
-| 2026-02-27 | v1.2.9.4 | 修复 SQL 执行失败后重复插入历史记录问题 |
-
-**最后更新**: 2026-02-28
+## Long-Term
+1. Optional plugin/tooling ecosystem enhancements.
+2. Broader enterprise integration guidance.

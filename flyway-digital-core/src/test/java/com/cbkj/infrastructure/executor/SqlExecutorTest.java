@@ -188,8 +188,8 @@ public class SqlExecutorTest {
      */
     @Test
     public void testExtractDatabaseName() throws Exception {
-        // 使用反射访问私有方法 extractDatabaseName
-        java.lang.reflect.Method method = SqlExecutor.class.getDeclaredMethod("extractDatabaseName", String.class);
+        // 使用反射访问私有方法 extractNamespace
+        java.lang.reflect.Method method = SqlExecutor.class.getDeclaredMethod("extractNamespace", String.class);
         method.setAccessible(true);
 
         // 创建 SqlExecutor 实例
@@ -221,6 +221,68 @@ public class SqlExecutorTest {
         String sql5 = "SELECT * FROM users WHERE id = 1";
         String result5 = (String) method.invoke(executor, sql5);
         assertNull(result5);
+    }
+
+    /**
+     * 风险验证：当提取到非法 namespace（如包含中划线）时，会在执行前抛出 IllegalArgumentException
+     */
+    @Test
+    public void testExecuteInTransactionFailsFastOnInvalidNamespaceIdentifier() throws Exception {
+        org.h2.jdbcx.JdbcDataSource ds = new org.h2.jdbcx.JdbcDataSource();
+        ds.setURL("jdbc:h2:mem:test_invalid_namespace;MODE=MYSQL;DB_CLOSE_DELAY=-1");
+
+        try (java.sql.Connection conn = ds.getConnection();
+             java.sql.Statement stmt = conn.createStatement()) {
+            stmt.execute("CREATE SCHEMA IF NOT EXISTS PUBLIC");
+            stmt.execute("CREATE TABLE IF NOT EXISTS PUBLIC.users (id INT PRIMARY KEY)");
+            stmt.execute("MERGE INTO PUBLIC.users KEY(id) VALUES(1)");
+        }
+
+        SqlExecutor executor = new SqlExecutor(ds);
+
+        Exception thrown = null;
+        try {
+            executor.executeInTransaction("UPDATE `my-db`.users SET id = 1 WHERE id = 1;", "risk-invalid-namespace.sql");
+        } catch (Exception e) {
+            thrown = e;
+        }
+
+        assertNotNull("Should throw exception when namespace identifier is invalid", thrown);
+        assertNotNull("Wrapped cause should exist", thrown.getCause());
+        assertTrue("Cause should be IllegalArgumentException",
+                thrown.getCause() instanceof IllegalArgumentException);
+        assertTrue("Error should mention invalid database/schema name",
+                thrown.getCause().getMessage().contains("Invalid database/schema name"));
+    }
+
+    /**
+     * 风险验证：当 namespace 合法时，不应因 namespace 校验导致失败（H2 上按原 SQL 执行）
+     */
+    @Test
+    public void testExecuteInTransactionSucceedsOnValidNamespaceIdentifier() throws Exception {
+        org.h2.jdbcx.JdbcDataSource ds = new org.h2.jdbcx.JdbcDataSource();
+        ds.setURL("jdbc:h2:mem:test_valid_namespace;MODE=MYSQL;DB_CLOSE_DELAY=-1");
+
+        try (java.sql.Connection conn = ds.getConnection();
+             java.sql.Statement stmt = conn.createStatement()) {
+            stmt.execute("CREATE SCHEMA IF NOT EXISTS mydb");
+            stmt.execute("CREATE TABLE IF NOT EXISTS mydb.users (id INT PRIMARY KEY)");
+            stmt.execute("MERGE INTO mydb.users KEY(id) VALUES(1)");
+        }
+
+        SqlExecutor executor = new SqlExecutor(ds);
+        long elapsed = executor.executeInTransaction(
+                "UPDATE mydb.users SET id = 2 WHERE id = 1;",
+                "risk-valid-namespace.sql");
+
+        assertTrue("Execution time should be non-negative", elapsed >= 0L);
+
+        try (java.sql.Connection conn = ds.getConnection();
+             java.sql.Statement stmt = conn.createStatement();
+             java.sql.ResultSet rs = stmt.executeQuery("SELECT COUNT(*) FROM mydb.users WHERE id = 2")) {
+            assertTrue(rs.next());
+            assertEquals(1, rs.getInt(1));
+        }
     }
 
     // ==================== PL/SQL 块测试用例 ====================
