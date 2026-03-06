@@ -1,19 +1,19 @@
-# Current Task
+# 当前任务
 
-Status: Completed
-Last Updated: 2026-03-06
+状态：已完成  
+最后更新：2026-03-06
 
-## Task Goal
-Release version `1.3.6.1` to Maven, synchronize `.ai` documents, and commit changes.
+## 任务目标
+发布 `1.3.6.1` 到 Maven，并同步 `.ai` 全部文档。
 
-## Completed Items
-- [x] Reviewed and updated `SqlExecutor` related tests.
-- [x] Added risk-validation unit tests for namespace identifier behavior.
-- [x] Updated all module `pom.xml` versions to `1.3.6.1`.
-- [x] Ran full tests (`mvn test`) successfully.
-- [x] Published to Maven (`core` + `starter`) successfully.
-- [x] Updated all files under `.ai` to current release context.
+## 已完成
+- [x] `SqlExecutor` 相关测试对齐与补充
+- [x] 增加 namespace 风险验证测试
+- [x] 所有 `pom.xml` 版本升级到 `1.3.6.1`
+- [x] 执行 `mvn test` 并通过
+- [x] 发布 core + starter 到 Maven
+- [x] 同步 `.ai` 全部文件
 
-## Notes
-- Risk validation confirms strict identifier check fails fast on invalid namespace tokens (e.g. `my-db`).
-- Existing project convention states actual db names use underscore style, so current behavior is acceptable.
+## 说明
+- 风险测试确认：非法 namespace（如 `my-db`）会快速失败。
+- 当前项目命名约定使用下划线风格，现行为可接受。

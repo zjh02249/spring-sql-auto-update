@@ -1,23 +1,22 @@
-# .ai Usage
+# .ai 使用指南
 
-## Goal
-Keep long-running project context stable across sessions and collaborators.
+## 目标
+为长期开发提供稳定上下文，支持多人协作与会话切换。
 
-## Standard Workflow
-1. Read `context.md`, `constraints.md`, `summary.md` before development.
-2. Update `current-task.md` while implementing.
-3. If behavior or architecture changes, append ADR in `decisions.md`.
-4. Before release: update versions, run tests, deploy, refresh `.ai` files.
-5. Commit code + docs together.
+## 标准流程
+1. 开发前阅读：`context.md`、`constraints.md`、`summary.md`。
+2. 开发中持续更新：`current-task.md`。
+3. 发生设计/行为变更：追加到 `decisions.md`。
+4. 发布时执行：版本同步 -> 测试 -> 发布 -> `.ai` 同步 -> Git 提交。
 
-## Release Checklist
-1. Update all `pom.xml` versions.
-2. Run `mvn test`.
-3. Deploy publishable modules:
+## 发布检查清单
+1. 更新所有 `pom.xml` 版本号。
+2. 执行 `mvn test`。
+3. 发布核心模块：
    `mvn clean deploy -DskipTests -pl flyway-digital-core,flyway-digital-spring-boot-starter -am`
-4. Update `.ai` docs to final released version.
-5. Commit all changes.
+4. 更新 `.ai` 全部文档。
+5. 统一提交代码与文档。
 
-## Current Baseline
-- Released version: `1.3.6.1`
-- Release date: `2026-03-06`
+## 当前基线
+- 已发布版本：`1.3.6.1`
+- 发布时间：`2026-03-06`

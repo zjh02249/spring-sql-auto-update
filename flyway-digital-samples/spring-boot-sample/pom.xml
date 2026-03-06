@@ -80,7 +80,7 @@
         </plugins>
     </build>
 
-    <!-- 缁ф壙鐖堕」鐩殑鍙戝竷閰嶇疆 -->
+    <!-- 继承父项目的发布配置 -->
     <distributionManagement>
         <repository>
             <id>maven-releases</id>

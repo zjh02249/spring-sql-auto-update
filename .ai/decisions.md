@@ -1,35 +1,34 @@
-# Architecture Decisions
+# 架构决策记录
 
-## ADR-009: SqlExecutor Namespace Handling Refresh
-Date: 2026-03-06
-Status: Accepted
+## ADR-009：SqlExecutor namespace 处理升级
+日期：2026-03-06  
+状态：已采纳
 
-### Context
-A refresh was required for `SqlExecutor` to address namespace restore behavior and improve namespace extraction coverage.
+### 背景
+需要修复脚本执行后默认库/schema 恢复问题，并扩大 namespace 提取覆盖范围。
 
-### Decision
-- Use namespace-centric extraction (`extractNamespace`) instead of old `extractDatabaseName` naming.
-- Expand extraction patterns across UPDATE/DELETE/INSERT/REPLACE/CREATE/ALTER/DROP/TRUNCATE.
-- Use JDBC `Savepoint` API for namespace switch rollback safety.
-- Always attempt restoration to default namespace in statement-finalization path when switched.
+### 决策
+- 使用 `extractNamespace` 作为新语义命名。
+- 支持 UPDATE/DELETE/INSERT/REPLACE/CREATE/ALTER/DROP/TRUNCATE 的 namespace 提取。
+- 使用 JDBC `Savepoint` API 处理切换失败回滚。
+- 在语句级 finally 中确保尝试恢复默认 namespace。
 
-### Consequences
-- Better resilience for namespace switch failures and transactional safety.
-- Stricter identifier validation may reject non-underscore naming style tokens.
-- Added dedicated tests to verify strictness behavior and normal-path success.
+### 影响
+- namespace 切换失败时事务安全性更高。
+- 标识符校验更严格，非约定命名会快速失败。
+- 已补充测试验证严格模式与正常路径。
 
-## ADR-010: Release 1.3.6.1 Process Baseline
-Date: 2026-03-06
-Status: Accepted
+## ADR-010：1.3.6.1 发布流程基线
+日期：2026-03-06  
+状态：已采纳
 
-### Decision
-Adopt the enforced release sequence:
-1. Version sync
-2. Full test run
-3. Targeted deploy (core + starter)
-4. `.ai` synchronization
-5. Git commit
+### 决策
+发布固定流程：
+1. 版本同步
+2. 全量测试
+3. 定向发布（core + starter）
+4. `.ai` 文档同步
+5. Git 提交
 
-### Consequences
-- Higher release consistency and traceability.
-- Lower risk of stale docs/version drift.
+### 结果
+降低发布遗漏和版本漂移风险，提升可追溯性。

@@ -14,20 +14,20 @@
     <description>A lightweight, Flyway-compatible SQL migration tool</description>
 
     <properties>
-        <!-- 缂栬瘧閰嶇疆 -->
+        <!-- 编译配置 -->
         <maven.compiler.source>1.8</maven.compiler.source>
         <maven.compiler.target>1.8</maven.compiler.target>
         <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
         <project.reporting.outputEncoding>UTF-8</project.reporting.outputEncoding>
 
-        <!-- 鐗堟湰鍙风鐞?-->
+        <!-- 版本号管理 -->
         <spring-boot.version>2.7.18</spring-boot.version>
         <slf4j.version>1.7.36</slf4j.version>
         <junit.version>4.13.2</junit.version>
         <h2.version>2.2.224</h2.version>
         <mysql-connector.version>8.0.33</mysql-connector.version>
 
-        <!-- 鎻掍欢鐗堟湰 -->
+        <!-- 插件版本 -->
         <maven-compiler-plugin.version>3.11.0</maven-compiler-plugin.version>
         <maven-surefire-plugin.version>3.1.2</maven-surefire-plugin.version>
         <jacoco.version>0.8.11</jacoco.version>
@@ -35,39 +35,38 @@
 
     <!--
         ============================================
-        妯″潡鍒嗙被璇存槑锛堥儴缃茶鑼冿級
+        模块发布说明（重要）
         ============================================
-        
-        銆愭牳蹇冩ā鍧?- 闇€瑕佸彂甯冨埌 Maven 浠撳簱銆?        杩欎簺妯″潡浼氳鍏朵粬椤圭洰渚濊禆锛屽繀椤诲彂甯冨埌 Maven 浠撳簱
-        - flyway-digital-core: 鏍稿績杩佺Щ寮曟搸
-        - flyway-digital-spring-boot-starter: Spring Boot 鑷姩閰嶇疆 Starter
-        
-        銆愮ず渚嬫ā鍧?- 涓嶉渶瑕佸彂甯冨埌 Maven 浠撳簱銆?        杩欎簺妯″潡浠呯敤浜庢紨绀猴紝宸查厤缃?maven.deploy.skip=true
-        閮ㄧ讲鏃朵細鑷姩璺宠繃锛屼笉鍙戝竷鍒?Maven 浠撳簱
-        - flyway-digital-samples (鑱氬悎妯″潡)
-          - spring-boot-sample: Spring Boot 闆嗘垚绀轰緥
-          - standalone-sample: 鐙珛浣跨敤绀轰緥
-        
-        銆愬彂甯冨懡浠ゃ€?        鎺ㄨ崘鍙彂甯冩牳蹇冩ā鍧楋細
+
+        需要发布到 Maven 仓库：
+        - flyway-digital-core
+        - flyway-digital-spring-boot-starter
+
+        示例模块不发布（仅演示用途）：
+        - flyway-digital-samples
+          - spring-boot-sample
+          - standalone-sample
+
+        推荐发布命令：
         mvn clean deploy -DskipTests \
             -pl flyway-digital-core,flyway-digital-spring-boot-starter \
             -am
-        
-        璇︾粏璇存槑璇峰弬鑰?BUILD_AND_DEPLOY.md
+
+        详细说明见 BUILD_AND_DEPLOY.md
         ============================================
     -->
     <modules>
-        <!-- 鏍稿績妯″潡锛堥渶瑕佸彂甯冨埌 Maven 浠撳簱锛?-->
+        <!-- 核心模块（需要发布到 Maven 仓库） -->
         <module>flyway-digital-core</module>
         <module>flyway-digital-spring-boot-starter</module>
         
-        <!-- 绀轰緥妯″潡锛堜笉闇€瑕佸彂甯冨埌 Maven 浠撳簱锛?-->
+        <!-- 示例模块（不发布到 Maven 仓库） -->
         <module>flyway-digital-samples</module>
     </modules>
 
     <dependencyManagement>
         <dependencies>
-            <!-- 鍐呴儴妯″潡 -->
+            <!-- 内部模块 -->
             <dependency>
                 <groupId>com.cbkj.infrastructure</groupId>
                 <artifactId>flyway-digital-core</artifactId>
@@ -95,7 +94,7 @@
                 <version>${slf4j.version}</version>
             </dependency>
 
-            <!-- 娴嬭瘯渚濊禆 -->
+            <!-- 测试依赖 -->
             <dependency>
                 <groupId>junit</groupId>
                 <artifactId>junit</artifactId>
@@ -175,7 +174,7 @@
         </pluginManagement>
     </build>
 
-    <!-- 绉佹湁 Maven 浠撳簱閰嶇疆 - 鍙戝竷鐩爣浠撳簱 -->
+    <!-- 私有 Maven 仓库配置（发布目标仓库） -->
     <distributionManagement>
         <repository>
             <id>maven-releases</id>

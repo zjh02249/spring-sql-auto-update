@@ -1,27 +1,26 @@
-# Project Context
+# 项目背景
 
-## Overview
-- Name: Flyway Digital
-- Positioning: Lightweight Flyway-compatible SQL migration tool
-- Current released version: `1.3.6.1`
-- Last release date: `2026-03-06`
+## 项目概述
+- 名称：Flyway Digital
+- 定位：轻量级、Flyway-Compatible SQL 迁移工具
+- 当前已发布版本：`1.3.6.1`
+- 最后发布时间：`2026-03-06`
 
-## Core Capabilities
-- Semantic migration version ordering
-- CRC32 checksum validation
-- Transactional script execution
-- Baseline-on-migrate support
-- Spring Boot starter auto-configuration (2.x/3.x compatible)
-- Dynamic datasource integration
+## 核心能力
+- 语义版本迁移排序
+- CRC32 校验
+- 脚本事务执行
+- baseline-on-migrate
+- Spring Boot Starter 自动配置（2.x/3.x）
+- 动态数据源支持
 
-## Module Structure
-- `flyway-digital-core`: migration engine and runtime logic
-- `flyway-digital-spring-boot-starter`: Spring Boot integration
-- `flyway-digital-samples`: usage demos, non-publishable modules
+## 模块结构
+- `flyway-digital-core`：迁移执行引擎
+- `flyway-digital-spring-boot-starter`：Spring 集成
+- `flyway-digital-samples`：示例（不发布）
 
-## Current Release Notes (1.3.6.1)
-- Replaced `SqlExecutor` implementation to strengthen namespace handling.
-- Added savepoint-based namespace switch safety path.
-- Added risk validation tests for namespace identifier strictness.
-- Full test suite passed before release.
-- Core and starter successfully published to Maven repository.
+## 1.3.6.1 变更摘要
+- 替换 `SqlExecutor` 实现，增强 namespace 处理与恢复。
+- 使用 JDBC Savepoint 处理切换失败回滚。
+- 新增 namespace 标识符风险验证测试。
+- 全量测试通过后完成 Maven 发布。

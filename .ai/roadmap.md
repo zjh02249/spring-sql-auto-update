@@ -1,24 +1,24 @@
-# Roadmap
+# 项目路线图
 
-Last Updated: 2026-03-06
-Current Version: 1.3.6.1
+最后更新：2026-03-06  
+当前版本：1.3.6.1
 
-## Completed
-- Core migration engine available and stable.
-- Spring Boot starter integration complete.
-- Dynamic datasource support complete.
-- SqlExecutor namespace-restore fix and safety enhancement released in 1.3.6.1.
+## 已完成
+- 核心迁移引擎稳定可用
+- Spring Boot Starter 可用
+- 动态数据源支持完成
+- SqlExecutor namespace 恢复与安全增强发布（1.3.6.1）
 
-## Near-Term
-1. Add more integration tests for cross-dialect namespace behaviors.
-2. Review identifier validation strategy against real production naming conventions.
-3. Continue coverage improvement and execution path hardening.
+## 近期计划
+1. 增加跨数据库方言 namespace 集成测试
+2. 评估标识符严格校验与实际命名规范匹配度
+3. 持续补齐关键执行路径测试
 
-## Mid-Term
-1. Optional CLI improvements.
-2. More operational diagnostics and migration observability.
-3. Additional docs for edge-case SQL scripts.
+## 中期计划
+1. CLI 体验改进
+2. 增强迁移执行可观测性
+3. 补充复杂 SQL 场景文档
 
-## Long-Term
-1. Optional plugin/tooling ecosystem enhancements.
-2. Broader enterprise integration guidance.
+## 长期计划
+1. 工具链/插件生态扩展
+2. 企业集成最佳实践沉淀
