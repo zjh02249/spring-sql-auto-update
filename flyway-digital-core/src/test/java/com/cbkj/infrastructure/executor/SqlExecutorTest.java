@@ -247,11 +247,11 @@ public class SqlExecutorTest {
             thrown = e;
         }
 
-        assertNotNull("Should throw exception when namespace identifier is invalid", thrown);
-        assertNotNull("Wrapped cause should exist", thrown.getCause());
-        assertTrue("Cause should be IllegalArgumentException",
+        assertNotNull("当 namespace 标识符非法时应抛出异常", thrown);
+        assertNotNull("应包含包装后的根因异常", thrown.getCause());
+        assertTrue("根因异常应为 IllegalArgumentException",
                 thrown.getCause() instanceof IllegalArgumentException);
-        assertTrue("Error should mention invalid database/schema name",
+        assertTrue("错误信息应包含非法数据库/schema 名称提示",
                 thrown.getCause().getMessage().contains("Invalid database/schema name"));
     }
 
@@ -275,7 +275,7 @@ public class SqlExecutorTest {
                 "UPDATE mydb.users SET id = 2 WHERE id = 1;",
                 "risk-valid-namespace.sql");
 
-        assertTrue("Execution time should be non-negative", elapsed >= 0L);
+        assertTrue("执行耗时应为非负数", elapsed >= 0L);
 
         try (java.sql.Connection conn = ds.getConnection();
              java.sql.Statement stmt = conn.createStatement();
@@ -401,46 +401,46 @@ public class SqlExecutorTest {
 
     @Test
     public void testSetManualCommitModeMethodExists() throws Exception {
-        // Verifies that the method exists and can be accessed
+        // 验证该方法存在且可被访问
         org.h2.jdbcx.JdbcDataSource ds = new org.h2.jdbcx.JdbcDataSource();
         ds.setURL("jdbc:h2:mem:test;MODE=MYSQL");
         SqlExecutor executor = new SqlExecutor(ds);
         
         java.lang.reflect.Method method = SqlExecutor.class.getDeclaredMethod("setManualCommitMode", java.sql.Connection.class);
-        assertNotNull("Method setManualCommitMode should exist", method);
+        assertNotNull("应存在 setManualCommitMode 方法", method);
     }
     
     @Test
     public void testCommitTransactionMethodExists() throws Exception {
-        // Verifies that the method exists and can be accessed
+        // 验证该方法存在且可被访问
         org.h2.jdbcx.JdbcDataSource ds = new org.h2.jdbcx.JdbcDataSource();
         ds.setURL("jdbc:h2:mem:test;MODE=MYSQL");
         SqlExecutor executor = new SqlExecutor(ds);
         
         java.lang.reflect.Method method = SqlExecutor.class.getDeclaredMethod("commitTransaction", java.sql.Connection.class);
-        assertNotNull("Method commitTransaction should exist", method);
+        assertNotNull("应存在 commitTransaction 方法", method);
     }
     
     @Test
     public void testRollbackTransactionMethodExists() throws Exception {
-        // Verifies that the method exists and can be accessed
+        // 验证该方法存在且可被访问
         org.h2.jdbcx.JdbcDataSource ds = new org.h2.jdbcx.JdbcDataSource();
         ds.setURL("jdbc:h2:mem:test;MODE=MYSQL");
         SqlExecutor executor = new SqlExecutor(ds);
         
         java.lang.reflect.Method method = SqlExecutor.class.getDeclaredMethod("rollbackTransaction", java.sql.Connection.class);
-        assertNotNull("Method rollbackTransaction should exist", method);
+        assertNotNull("应存在 rollbackTransaction 方法", method);
     }
     
     @Test
     public void testRestoreAutoCommitModeMethodExists() throws Exception {
-        // Verifies that the method exists and can be accessed
+        // 验证该方法存在且可被访问
         org.h2.jdbcx.JdbcDataSource ds = new org.h2.jdbcx.JdbcDataSource();
         ds.setURL("jdbc:h2:mem:test;MODE=MYSQL");
         SqlExecutor executor = new SqlExecutor(ds);
         
         java.lang.reflect.Method method = SqlExecutor.class.getDeclaredMethod("restoreAutoCommitMode", java.sql.Connection.class, boolean.class);
-        assertNotNull("Method restoreAutoCommitMode should exist", method);
+        assertNotNull("应存在 restoreAutoCommitMode 方法", method);
     }
 
 
