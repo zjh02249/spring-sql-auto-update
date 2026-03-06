@@ -1,4 +1,4 @@
-package com.cbkj.infrastructure.core.config;
+package com.cbkj.infrastructure.config;
 
 /**
  * FlywayDigital 配置类

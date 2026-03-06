@@ -2,10 +2,15 @@ package com.cbkj.infrastructure.util;
 
 import org.junit.Test;
 
+import java.io.ByteArrayInputStream;
+
 import static org.junit.Assert.*;
 
 public class ChecksumCalculatorTest {
 
+    /**
+     * 验证相同字符串内容会生成相同校验和，不同内容会生成不同校验和。
+     */
     @Test
     public void testCalculateString() {
         String content1 = "CREATE TABLE users (id INT PRIMARY KEY);";
@@ -23,6 +28,9 @@ public class ChecksumCalculatorTest {
         assertNotEquals(checksum1, checksum3);
     }
 
+    /**
+     * 验证空字符串的 CRC32 结果为 0。
+     */
     @Test
     public void testCalculateEmptyString() {
         int checksum = ChecksumCalculator.calculate("");
@@ -30,18 +38,27 @@ public class ChecksumCalculatorTest {
         assertEquals(0, checksum);
     }
 
+    /**
+     * 验证 null 字符串输入会返回 0。
+     */
     @Test
     public void testCalculateNullString() {
         int checksum = ChecksumCalculator.calculate((String) null);
         assertEquals(0, checksum);
     }
 
+    /**
+     * 验证 null 字节数组输入会返回 0。
+     */
     @Test
     public void testCalculateNullBytes() {
         int checksum = ChecksumCalculator.calculate((byte[]) null);
         assertEquals(0, checksum);
     }
 
+    /**
+     * 验证字节数组输入的 CRC32 计算结果稳定。
+     */
     @Test
     public void testCalculateByteArray() {
         byte[] bytes1 = "CREATE TABLE test (id INT);".getBytes();
@@ -56,6 +73,9 @@ public class ChecksumCalculatorTest {
         assertNotEquals(checksum1, checksum3);
     }
 
+    /**
+     * 验证字符串和对应字节数组的校验和结果一致。
+     */
     @Test
     public void testConsistencyWithStringAndBytes() {
         String content = "CREATE TABLE users (id INT PRIMARY KEY, name VARCHAR(100));";
@@ -64,5 +84,25 @@ public class ChecksumCalculatorTest {
         int checksumFromBytes = ChecksumCalculator.calculate(content.getBytes());
         
         assertEquals(checksumFromString, checksumFromBytes);
+    }
+
+    /**
+     * 验证 InputStream 输入的 CRC32 结果与字节数组一致。
+     */
+    @Test
+    public void testCalculateInputStream() throws Exception {
+        byte[] bytes = "CREATE TABLE stream_test (id INT PRIMARY KEY);".getBytes("UTF-8");
+        int checksumFromStream = ChecksumCalculator.calculate(new ByteArrayInputStream(bytes));
+        int checksumFromBytes = ChecksumCalculator.calculate(bytes);
+
+        assertEquals(checksumFromBytes, checksumFromStream);
+    }
+
+    /**
+     * 验证 null 输入流会返回 0。
+     */
+    @Test
+    public void testCalculateNullInputStream() throws Exception {
+        assertEquals(0, ChecksumCalculator.calculate((ByteArrayInputStream) null));
     }
 }

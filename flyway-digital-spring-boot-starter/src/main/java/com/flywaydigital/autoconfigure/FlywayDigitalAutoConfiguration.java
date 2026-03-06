@@ -1,7 +1,7 @@
 package com.cbkj.infrastructure.autoconfigure;
 
 import com.cbkj.infrastructure.core.FlywayDigital;
-import com.cbkj.infrastructure.core.config.FlywayDigitalConfig;
+import com.cbkj.infrastructure.config.FlywayDigitalConfig;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;

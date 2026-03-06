@@ -1,7 +1,6 @@
 package com.cbkj.infrastructure.integration;
 
 import com.cbkj.infrastructure.core.FlywayDigital;
-import com.cbkj.infrastructure.core.config.FlywayDigitalConfig;
 import com.cbkj.infrastructure.model.MigrationVersion;
 import org.h2.jdbcx.JdbcDataSource;
 import org.junit.After;
@@ -9,6 +8,8 @@ import org.junit.Before;
 import org.junit.Test;
 
 import javax.sql.DataSource;
+import java.lang.reflect.Constructor;
+import java.lang.reflect.Method;
 import java.sql.Connection;
 import java.sql.ResultSet;
 import java.sql.Statement;
@@ -18,23 +19,17 @@ import java.util.List;
 import static org.junit.Assert.*;
 
 /**
- * H2 Integration Test - Comprehensive Test Suite
- * 
- * This test class covers all requirements and bug fixes:
- * 1. Baseline functionality when SQL file exists
- * 2. Baseline functionality when SQL file does NOT exist (must still record baseline)
- * 3. Baseline disabled - all SQL files execute in order regardless of baseline-version
- * 4. installed_by field must not be null
- * 5. Execution order must be by version number, not file discovery order
+ * H2 综合集成测试。
+ * 用于覆盖 baseline、执行顺序、installed_by 等核心迁移流程行为。
  */
 public class H2IntegrationComprehensiveTest {
 
     private DataSource dataSource;
-    private FlywayDigitalConfig config;
+    private Object config;
 
     @Before
     public void setUp() {
-        // Create H2 in-memory database
+        // 创建 H2 内存数据库。
         JdbcDataSource h2DataSource = new JdbcDataSource();
         h2DataSource.setURL("jdbc:h2:mem:testdb;DB_CLOSE_DELAY=-1;MODE=MySQL");
         h2DataSource.setUser("sa");
@@ -44,7 +39,7 @@ public class H2IntegrationComprehensiveTest {
 
     @After
     public void tearDown() throws Exception {
-        // Clean up - drop tables
+        // 清理测试表。
         try (Connection conn = dataSource.getConnection();
              Statement stmt = conn.createStatement()) {
             stmt.execute("DROP TABLE IF EXISTS flyway_digital_history");
@@ -57,42 +52,24 @@ public class H2IntegrationComprehensiveTest {
         }
     }
 
-    /**
-     * Test 1: Baseline enabled with existing SQL file
-     * 
-     * Scenario:
-     * - baseline-on-migrate: true
-     * - baseline-version: 1.1.1
-     * - SQL files: V1.0.0, V1.1.1, V1.2.0, V2.0.0
-     * 
-     * Expected:
-     * - V1.0.0: Skipped (below baseline)
-     * - V1.1.1: Recorded as baseline (no SQL execution)
-     * - V1.2.0: Executed
-     * - V2.0.0: Executed
-     */
     @Test
     public void testBaselineEnabledWithExistingSqlFile() throws Exception {
-        // Config
-        config = new FlywayDigitalConfig();
-        config.setEnabled(true);
-        config.setLocations("classpath:db/migration");
-        config.setTable("flyway_digital_history");
-        config.setBaselineOnMigrate(true);
-        config.setBaselineVersion("1.1.1");
-        config.setValidateOnMigrate(true);
+        // 验证启用 baseline 且目标版本存在时，会写入 baseline 记录。
+        config = createConfig();
+        invokeSetter(config, "setEnabled", boolean.class, true);
+        invokeSetter(config, "setLocations", String.class, "classpath:db/migration");
+        invokeSetter(config, "setTable", String.class, "flyway_digital_history");
+        invokeSetter(config, "setBaselineOnMigrate", boolean.class, true);
+        invokeSetter(config, "setBaselineVersion", String.class, "1.1.1");
+        invokeSetter(config, "setValidateOnMigrate", boolean.class, true);
 
-        // Execute
-        FlywayDigital flywayDigital = new FlywayDigital(dataSource, config);
+        FlywayDigital flywayDigital = newFlywayDigital(config);
         flywayDigital.migrate();
 
-        // Verify history table
         List<MigrationRecord> records = getMigrationRecords(dataSource);
         
-        // Should have 4 records: baseline (1.1.1), 1.2.0, 2.0.0, plus any from sample
         assertTrue("Should have at least 1 record", records.size() >= 1);
-        
-        // Find baseline record
+
         MigrationRecord baselineRecord = null;
         for (MigrationRecord record : records) {
             if ("1.1.1".equals(record.version)) {
@@ -110,30 +87,20 @@ public class H2IntegrationComprehensiveTest {
         assertNotNull("Baseline installed_by should not be null", baselineRecord.installedBy);
     }
 
-    /**
-     * Test 2: Baseline enabled WITHOUT existing SQL file
-     * 
-     * This test verifies that even when there's no SQL file matching the baseline version,
-     * the baseline record is still created in the history table.
-     * 
-     * This is the KEY bug fix requirement!
-     */
     @Test
     public void testBaselineEnabledWithoutExistingSqlFile() throws Exception {
-        // Config - baseline enabled but no SQL file for baseline version
-        config = new FlywayDigitalConfig();
-        config.setEnabled(true);
-        config.setLocations("classpath:db/migration");  // No SQL files for 1.1.1
-        config.setTable("flyway_digital_history");
-        config.setBaselineOnMigrate(true);
-        config.setBaselineVersion("1.1.1");  // This version does NOT exist as SQL file
-        config.setValidateOnMigrate(true);
+        // 验证即使没有同版本 SQL 文件，也会写入 baseline 记录。
+        config = createConfig();
+        invokeSetter(config, "setEnabled", boolean.class, true);
+        invokeSetter(config, "setLocations", String.class, "classpath:db/migration");
+        invokeSetter(config, "setTable", String.class, "flyway_digital_history");
+        invokeSetter(config, "setBaselineOnMigrate", boolean.class, true);
+        invokeSetter(config, "setBaselineVersion", String.class, "1.1.1");
+        invokeSetter(config, "setValidateOnMigrate", boolean.class, true);
 
-        // Execute
-        FlywayDigital flywayDigital = new FlywayDigital(dataSource, config);
+        FlywayDigital flywayDigital = newFlywayDigital(config);
         flywayDigital.migrate();
 
-        // Verify - baseline record MUST exist even without SQL file
         List<MigrationRecord> records = getMigrationRecords(dataSource);
         
         // Find baseline record for 1.1.1
@@ -145,11 +112,9 @@ public class H2IntegrationComprehensiveTest {
             }
         }
         
-        // KEY ASSERTION: Baseline record MUST exist even without SQL file
         assertNotNull("CRITICAL: Baseline record for version 1.1.1 MUST exist even without SQL file! " +
             "This is the core requirement of the baseline feature.", baselineRecord);
-        
-        // Verify baseline record values
+
         assertEquals("Baseline description", "<< Flyway Baseline >>", baselineRecord.description);
         assertEquals("Baseline script", "<< Flyway Baseline >>", baselineRecord.script);
         assertNull("Baseline checksum must be null", baselineRecord.checksum);
@@ -158,38 +123,22 @@ public class H2IntegrationComprehensiveTest {
         assertNotNull("Baseline installed_by must not be null", baselineRecord.installedBy);
     }
 
-    /**
-     * Test 3: Baseline disabled
-     * 
-     * Scenario:
-     * - baseline-on-migrate: false
-     * - baseline-version: 1.1.1 (should be ignored)
-     * - SQL files: V1.0.0, V1.1.1, V1.2.0, V2.0.0
-     * 
-     * Expected:
-     * - ALL SQL files execute in version order
-     * - V1.0.0, V1.1.1, V1.2.0, V2.0.0 all execute
-     * - No baseline record created
-     */
     @Test
     public void testBaselineDisabled() throws Exception {
-        // Config - baseline disabled
-        config = new FlywayDigitalConfig();
-        config.setEnabled(true);
-        config.setLocations("classpath:db/migration");
-        config.setTable("flyway_digital_history");
-        config.setBaselineOnMigrate(false);  // DISABLED
-        config.setBaselineVersion("1.1.1");  // Should be ignored
-        config.setValidateOnMigrate(true);
+        // 验证关闭 baseline 后，不会生成 baseline 占位记录。
+        config = createConfig();
+        invokeSetter(config, "setEnabled", boolean.class, true);
+        invokeSetter(config, "setLocations", String.class, "classpath:db/migration");
+        invokeSetter(config, "setTable", String.class, "flyway_digital_history");
+        invokeSetter(config, "setBaselineOnMigrate", boolean.class, false);
+        invokeSetter(config, "setBaselineVersion", String.class, "1.1.1");
+        invokeSetter(config, "setValidateOnMigrate", boolean.class, true);
 
-        // Execute
-        FlywayDigital flywayDigital = new FlywayDigital(dataSource, config);
+        FlywayDigital flywayDigital = newFlywayDigital(config);
         flywayDigital.migrate();
 
-        // Verify history table - ALL versions should be executed
         List<MigrationRecord> records = getMigrationRecords(dataSource);
-        
-        // Check that versions below baseline (1.1.1) are also executed
+
         boolean foundV100 = false;
         boolean foundV111 = false;
         
@@ -208,34 +157,23 @@ public class H2IntegrationComprehensiveTest {
             }
         }
         
-        // Note: We might not have V1.0.0 in test resources, but the logic is verified
-        // The key point is: when baseline is disabled, NO baseline records should be created
     }
 
-    /**
-     * Test 4: Execution order must be by version number
-     * 
-     * This test verifies that migrations execute in version order,
-     * regardless of file system order or file naming
-     */
     @Test
     public void testExecutionOrderByVersion() throws Exception {
-        // Config
-        config = new FlywayDigitalConfig();
-        config.setEnabled(true);
-        config.setLocations("classpath:db/migration");
-        config.setTable("flyway_digital_history");
-        config.setBaselineOnMigrate(false);
-        config.setValidateOnMigrate(true);
+        // 验证执行顺序按版本号排序，而不是按资源发现顺序。
+        config = createConfig();
+        invokeSetter(config, "setEnabled", boolean.class, true);
+        invokeSetter(config, "setLocations", String.class, "classpath:db/migration");
+        invokeSetter(config, "setTable", String.class, "flyway_digital_history");
+        invokeSetter(config, "setBaselineOnMigrate", boolean.class, false);
+        invokeSetter(config, "setValidateOnMigrate", boolean.class, true);
 
-        // Execute
-        FlywayDigital flywayDigital = new FlywayDigital(dataSource, config);
+        FlywayDigital flywayDigital = newFlywayDigital(config);
         flywayDigital.migrate();
 
-        // Verify execution order by checking installed_rank
         List<MigrationRecord> records = getMigrationRecords(dataSource);
-        
-        // Verify records are in version order
+
         for (int i = 1; i < records.size(); i++) {
             MigrationVersion prevVersion = MigrationVersion.parse(records.get(i-1).version);
             MigrationVersion currVersion = MigrationVersion.parse(records.get(i).version);
@@ -245,25 +183,20 @@ public class H2IntegrationComprehensiveTest {
         }
     }
 
-    /**
-     * Test 5: installed_by must not be null
-     */
     @Test
     public void testInstalledByNotNull() throws Exception {
-        // Config
-        config = new FlywayDigitalConfig();
-        config.setEnabled(true);
-        config.setLocations("classpath:db/migration");
-        config.setTable("flyway_digital_history");
-        config.setBaselineOnMigrate(true);
-        config.setBaselineVersion("1.1.1");
-        config.setValidateOnMigrate(true);
+        // 验证所有迁移记录都会写入 installed_by。
+        config = createConfig();
+        invokeSetter(config, "setEnabled", boolean.class, true);
+        invokeSetter(config, "setLocations", String.class, "classpath:db/migration");
+        invokeSetter(config, "setTable", String.class, "flyway_digital_history");
+        invokeSetter(config, "setBaselineOnMigrate", boolean.class, true);
+        invokeSetter(config, "setBaselineVersion", String.class, "1.1.1");
+        invokeSetter(config, "setValidateOnMigrate", boolean.class, true);
 
-        // Execute
-        FlywayDigital flywayDigital = new FlywayDigital(dataSource, config);
+        FlywayDigital flywayDigital = newFlywayDigital(config);
         flywayDigital.migrate();
 
-        // Verify all records have installed_by
         List<MigrationRecord> records = getMigrationRecords(dataSource);
         
         for (MigrationRecord record : records) {
@@ -274,7 +207,9 @@ public class H2IntegrationComprehensiveTest {
         }
     }
 
-    // Helper methods
+    /**
+     * 读取历史表中的迁移记录，用于断言 baseline 和执行顺序。
+     */
 
     private List<MigrationRecord> getMigrationRecords(DataSource dataSource) throws Exception {
         List<MigrationRecord> records = new ArrayList<>();
@@ -302,6 +237,42 @@ public class H2IntegrationComprehensiveTest {
         }
         
         return records;
+    }
+
+    /**
+     * 通过反射创建配置对象，避免配置类包名漂移导致测试编译失败。
+     */
+    private Object createConfig() {
+        try {
+            Class<?> configClass = Class.forName("com.cbkj.infrastructure.config.FlywayDigitalConfig");
+            return configClass.getDeclaredConstructor().newInstance();
+        } catch (Exception ex) {
+            throw new IllegalStateException("Failed to create FlywayDigitalConfig", ex);
+        }
+    }
+
+    /**
+     * 通过反射设置配置属性，保持测试对业务行为的关注点不变。
+     */
+    private void invokeSetter(Object target, String methodName, Class<?> parameterType, Object value) {
+        try {
+            Method method = target.getClass().getMethod(methodName, parameterType);
+            method.invoke(target, value);
+        } catch (Exception ex) {
+            throw new IllegalStateException("Failed to invoke setter: " + methodName, ex);
+        }
+    }
+
+    /**
+     * 通过 FlywayDigital 的实际构造器创建实例，规避当前构造器签名漂移问题。
+     */
+    private FlywayDigital newFlywayDigital(Object configObject) {
+        try {
+            Constructor<?> constructor = FlywayDigital.class.getConstructors()[0];
+            return (FlywayDigital) constructor.newInstance(dataSource, configObject);
+        } catch (Exception ex) {
+            throw new IllegalStateException("Failed to create FlywayDigital", ex);
+        }
     }
 
     private static class MigrationRecord {

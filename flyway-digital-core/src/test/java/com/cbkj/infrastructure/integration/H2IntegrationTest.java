@@ -1,13 +1,14 @@
 package com.cbkj.infrastructure.integration;
 
 import com.cbkj.infrastructure.core.FlywayDigital;
-import com.cbkj.infrastructure.core.config.FlywayDigitalConfig;
 import org.h2.jdbcx.JdbcDataSource;
 import org.junit.After;
 import org.junit.Before;
 import org.junit.Test;
 
 import javax.sql.DataSource;
+import java.lang.reflect.Constructor;
+import java.lang.reflect.Method;
 import java.sql.Connection;
 import java.sql.ResultSet;
 import java.sql.Statement;
@@ -15,35 +16,34 @@ import java.sql.Statement;
 import static org.junit.Assert.*;
 
 /**
- * H2 Integration Test
- * Tests the complete migration flow with an in-memory H2 database
+ * H2 集成测试。
+ * 用于验证 FlywayDigital 在 H2 内存数据库中的完整迁移流程。
  */
 public class H2IntegrationTest {
 
     private DataSource dataSource;
-    private FlywayDigitalConfig config;
+    private Object config;
 
     @Before
     public void setUp() {
-        // Create H2 in-memory database
+        // 创建 H2 内存数据库。
         JdbcDataSource h2DataSource = new JdbcDataSource();
         h2DataSource.setURL("jdbc:h2:mem:testdb;DB_CLOSE_DELAY=-1;MODE=MySQL");
         h2DataSource.setUser("sa");
         h2DataSource.setPassword("");
         this.dataSource = h2DataSource;
 
-        // Configure FlywayDigital
-        config = new FlywayDigitalConfig();
-        config.setEnabled(true);
-        config.setLocations("classpath:db/migration");
-        config.setTable("flyway_digital_history");
-        config.setBaselineOnMigrate(false);
-        config.setValidateOnMigrate(true);
+        config = createConfig();
+        invokeSetter(config, "setEnabled", boolean.class, true);
+        invokeSetter(config, "setLocations", String.class, "classpath:db/migration");
+        invokeSetter(config, "setTable", String.class, "flyway_digital_history");
+        invokeSetter(config, "setBaselineOnMigrate", boolean.class, false);
+        invokeSetter(config, "setValidateOnMigrate", boolean.class, true);
     }
 
     @After
     public void tearDown() throws Exception {
-        // Clean up - drop tables
+        // 清理测试表。
         try (Connection conn = dataSource.getConnection();
              Statement stmt = conn.createStatement()) {
             stmt.execute("DROP TABLE IF EXISTS flyway_digital_history");
@@ -56,11 +56,11 @@ public class H2IntegrationTest {
 
     @Test
     public void testBasicMigration() throws Exception {
-        // Create and execute first migration
-        FlywayDigital flywayDigital = new FlywayDigital(dataSource, config);
+        // 验证基础迁移能够执行并写入历史表。
+        FlywayDigital flywayDigital = newFlywayDigital(config);
         flywayDigital.migrate();
 
-        // Verify history table was created
+        // 验证历史表已创建。
         try (Connection conn = dataSource.getConnection();
              Statement stmt = conn.createStatement();
              ResultSet rs = stmt.executeQuery(
@@ -70,7 +70,7 @@ public class H2IntegrationTest {
             assertTrue(rs.getInt(1) > 0);
         }
 
-        // Verify migrations were recorded
+        // 验证迁移记录已写入。
         try (Connection conn = dataSource.getConnection();
              Statement stmt = conn.createStatement();
              ResultSet rs = stmt.executeQuery(
@@ -82,11 +82,10 @@ public class H2IntegrationTest {
 
     @Test
     public void testIdempotentMigration() throws Exception {
-        // First migration
-        FlywayDigital flywayDigital = new FlywayDigital(dataSource, config);
+        // 验证重复执行迁移不会重复写入成功记录。
+        FlywayDigital flywayDigital = newFlywayDigital(config);
         flywayDigital.migrate();
 
-        // Get count after first migration
         int countAfterFirst;
         try (Connection conn = dataSource.getConnection();
              Statement stmt = conn.createStatement();
@@ -96,11 +95,9 @@ public class H2IntegrationTest {
             countAfterFirst = rs.getInt(1);
         }
 
-        // Second migration (should be idempotent)
-        FlywayDigital flywayDigital2 = new FlywayDigital(dataSource, config);
+        FlywayDigital flywayDigital2 = newFlywayDigital(config);
         flywayDigital2.migrate();
 
-        // Count should be the same
         try (Connection conn = dataSource.getConnection();
              Statement stmt = conn.createStatement();
              ResultSet rs = stmt.executeQuery(
@@ -112,19 +109,17 @@ public class H2IntegrationTest {
 
     @Test
     public void testChecksumValidation() throws Exception {
-        // First migration
-        FlywayDigital flywayDigital = new FlywayDigital(dataSource, config);
+        // 验证历史表中的 checksum 被篡改后会触发校验失败。
+        FlywayDigital flywayDigital = newFlywayDigital(config);
         flywayDigital.migrate();
 
-        // Modify a checksum in the history table to simulate changed SQL
         try (Connection conn = dataSource.getConnection();
              Statement stmt = conn.createStatement()) {
             stmt.execute("UPDATE flyway_digital_history SET checksum = checksum + 1 WHERE version = '1'");
         }
 
-        // Second migration should fail due to checksum mismatch
         try {
-            FlywayDigital flywayDigital2 = new FlywayDigital(dataSource, config);
+            FlywayDigital flywayDigital2 = newFlywayDigital(config);
             flywayDigital2.migrate();
             fail("Expected exception due to checksum mismatch");
         } catch (Exception e) {
@@ -135,13 +130,12 @@ public class H2IntegrationTest {
 
     @Test
     public void testDisabledMigration() throws Exception {
-        // Disable migration
-        config.setEnabled(false);
+        // 验证禁用迁移时不会创建历史表。
+        invokeSetter(config, "setEnabled", boolean.class, false);
 
-        FlywayDigital flywayDigital = new FlywayDigital(dataSource, config);
+        FlywayDigital flywayDigital = newFlywayDigital(config);
         flywayDigital.migrate();
 
-        // Verify history table was NOT created
         try (Connection conn = dataSource.getConnection();
              Statement stmt = conn.createStatement();
              ResultSet rs = stmt.executeQuery(
@@ -149,6 +143,42 @@ public class H2IntegrationTest {
                  "WHERE table_name = 'FLYWAY_DIGITAL_HISTORY'")) {
             assertTrue(rs.next());
             assertEquals(0, rs.getInt(1));
+        }
+    }
+
+    /**
+     * 通过反射创建配置对象，避免当前源码与编译产物中的包名漂移影响测试编译。
+     */
+    private Object createConfig() {
+        try {
+            Class<?> configClass = Class.forName("com.cbkj.infrastructure.config.FlywayDigitalConfig");
+            return configClass.getDeclaredConstructor().newInstance();
+        } catch (Exception ex) {
+            throw new IllegalStateException("Failed to create FlywayDigitalConfig", ex);
+        }
+    }
+
+    /**
+     * 统一通过反射设置配置属性，保持集成测试对配置对象的使用方式不变。
+     */
+    private void invokeSetter(Object target, String methodName, Class<?> parameterType, Object value) {
+        try {
+            Method method = target.getClass().getMethod(methodName, parameterType);
+            method.invoke(target, value);
+        } catch (Exception ex) {
+            throw new IllegalStateException("Failed to invoke setter: " + methodName, ex);
+        }
+    }
+
+    /**
+     * 通过 FlywayDigital 的实际构造器创建实例，规避配置类签名漂移问题。
+     */
+    private FlywayDigital newFlywayDigital(Object configObject) {
+        try {
+            Constructor<?> constructor = FlywayDigital.class.getConstructors()[0];
+            return (FlywayDigital) constructor.newInstance(dataSource, configObject);
+        } catch (Exception ex) {
+            throw new IllegalStateException("Failed to create FlywayDigital", ex);
         }
     }
 }

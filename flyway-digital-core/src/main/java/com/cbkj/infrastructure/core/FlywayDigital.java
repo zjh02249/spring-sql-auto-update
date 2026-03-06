@@ -1,6 +1,6 @@
 package com.cbkj.infrastructure.core;
 
-import com.cbkj.infrastructure.core.config.FlywayDigitalConfig;
+import com.cbkj.infrastructure.config.FlywayDigitalConfig;
 import com.cbkj.infrastructure.executor.SqlExecutor;
 import com.cbkj.infrastructure.history.HistoryRepository;
 import com.cbkj.infrastructure.history.HistoryTableManager;
