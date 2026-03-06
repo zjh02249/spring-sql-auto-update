@@ -126,3 +126,7 @@ public class DatabaseMigration {
 1. 持续补边界测试，防止后续回归。
 2. 开始性能评估与性能测试。
 3. 暂不优先启动 CLI、Plugin、回滚等第三阶段功能。
+
+## 相关性能文档
+
+- `PERFORMANCE_TESTING.md`
