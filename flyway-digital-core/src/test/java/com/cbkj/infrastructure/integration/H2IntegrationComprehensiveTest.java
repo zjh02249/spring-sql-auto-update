@@ -139,18 +139,13 @@ public class H2IntegrationComprehensiveTest {
 
         List<MigrationRecord> records = getMigrationRecords(dataSource);
 
-        boolean foundV100 = false;
-        boolean foundV111 = false;
-        
         for (MigrationRecord record : records) {
             if ("1.0.0".equals(record.version)) {
-                foundV100 = true;
                 // Should NOT be a baseline record
                 assertFalse("V1.0.0 should not be a baseline record", 
                     "<< Flyway Baseline >>".equals(record.description));
             }
             if ("1.1.1".equals(record.version)) {
-                foundV111 = true;
                 // Should NOT be a baseline record (baseline is disabled)
                 assertFalse("V1.1.1 should not be a baseline record when baseline is disabled", 
                     "<< Flyway Baseline >>".equals(record.description));
@@ -180,6 +175,56 @@ public class H2IntegrationComprehensiveTest {
             
             assertTrue("Records must be in version order", 
                 prevVersion.compareTo(currVersion) < 0);
+        }
+    }
+
+
+    @Test
+    public void testFailedHistoryBlocksRetry() throws Exception {
+        // 验证历史表中存在失败记录时，会阻断同版本迁移的再次执行。
+        config = createConfig();
+        invokeSetter(config, "setEnabled", boolean.class, true);
+        invokeSetter(config, "setLocations", String.class, "classpath:db/migration");
+        invokeSetter(config, "setTable", String.class, "flyway_digital_history");
+        invokeSetter(config, "setBaselineOnMigrate", boolean.class, false);
+        invokeSetter(config, "setValidateOnMigrate", boolean.class, true);
+
+        FlywayDigital flywayDigital = newFlywayDigital(config);
+        flywayDigital.migrate();
+
+        try (Connection conn = dataSource.getConnection();
+             Statement stmt = conn.createStatement()) {
+            stmt.execute("UPDATE flyway_digital_history SET success = 0 WHERE version = '1'");
+        }
+
+        try {
+            newFlywayDigital(config).migrate();
+            fail("Expected exception due to failed history record");
+        } catch (Exception ex) {
+            assertTrue(ex.getMessage().contains("has failed in a previous execution"));
+        }
+    }
+
+    @Test
+    public void testBaselineRecordNotDuplicatedOnSecondRun() throws Exception {
+        // 验证 baseline 记录在重复启动场景不会被重复写入。
+        config = createConfig();
+        invokeSetter(config, "setEnabled", boolean.class, true);
+        invokeSetter(config, "setLocations", String.class, "classpath:db/migration");
+        invokeSetter(config, "setTable", String.class, "flyway_digital_history");
+        invokeSetter(config, "setBaselineOnMigrate", boolean.class, true);
+        invokeSetter(config, "setBaselineVersion", String.class, "1.1.1");
+        invokeSetter(config, "setValidateOnMigrate", boolean.class, true);
+
+        FlywayDigital flywayDigital = newFlywayDigital(config);
+        flywayDigital.migrate();
+        flywayDigital.migrate();
+
+        try (Connection conn = dataSource.getConnection();
+             Statement stmt = conn.createStatement();
+             ResultSet rs = stmt.executeQuery("SELECT COUNT(*) FROM flyway_digital_history WHERE version = '1.1.1' AND description = '<< Flyway Baseline >>'")) {
+            assertTrue(rs.next());
+            assertEquals(1, rs.getInt(1));
         }
     }
 

@@ -146,3 +146,31 @@ mvn -pl flyway-digital-core -Pperf-benchmark test-compile exec:java \
   1. 评估 `SqlScanner` 重复扫描与日志输出成本
   2. 评估 `FlywayDigital` 重复启动时的扫描与过滤成本
   3. 再决定是否需要做对象创建与缓存优化
+
+## 第一轮优化点（已落地）
+
+为落实“首次迁移链路 + 重复启动扫描开销”分析结果，本轮先落地了低风险优化：
+
+1. **历史记录一次性加载，替代逐迁移重复查库**
+   - `FlywayDigital` 启动迁移时改为一次性加载 history，并在内存中构建：
+     - 成功版本索引（用于 checksum 校验与快速跳过）
+     - 失败版本集合（用于阻断重复执行）
+   - 目标：减少大批量场景下 `existsByVersion*` 的重复 SQL 查询。
+
+2. **大批量跳过场景日志降噪**
+   - 已应用迁移的逐条 `info` 日志改为 `debug`。
+   - 增加“本轮共跳过 N 条已应用迁移”的汇总 `info` 日志。
+   - 目标：降低重复启动（second run）场景日志 I/O 对耗时的放大效应。
+
+## 下一轮评估建议（验证本轮优化收益）
+
+建议使用既有命令重新采集 100 / 500 / 1000 规模数据，重点关注：
+
+- `migration benchmark` 的 `firstRunMs`：观察首次迁移链路是否下降。
+- `migration benchmark` 的 `secondRunMs`：观察重复启动成本是否下降。
+- `scanMs` 与 `secondRunMs` 的差值：估算扫描之外的过滤/日志开销是否缩小。
+
+若 second run 仍接近 scanMs，可进入下一轮优化：
+
+- 评估 **同 JVM 生命周期内的扫描结果缓存策略**（仅对稳定 location 生效）。
+- 评估 `SqlScanner` 文件内容读取与解析过程中的对象分配开销。
