@@ -124,9 +124,17 @@ public class DatabaseMigration {
 第二阶段最优先的工作仍然是质量与可维护性：
 
 1. 持续补边界测试，防止后续回归。
-2. 开始性能评估与性能测试。
+2. 持续性能评估并推进第一轮性能优化落地。
 3. 暂不优先启动 CLI、Plugin、回滚等第三阶段功能。
 
 ## 相关性能文档
 
 - `PERFORMANCE_TESTING.md`
+
+
+## 第二阶段性能优化执行建议
+
+- 先执行 `mvn -pl flyway-digital-core -Pperf-benchmark test-compile exec:java -Dexec.mainClass=com.cbkj.infrastructure.performance.PerformanceBenchmarkMain -Dperf.sizes=100,500,1000` 采集新基线。
+- 重点对比 `firstRunMs`、`secondRunMs` 与 `scanMs`，判断优化收益是否主要体现在首次链路或重复启动链路。
+- 每次优化后至少补 1 个边界/异常测试，避免性能改动引入行为回归。
+- 详细记录请同步更新 `PERFORMANCE_TESTING.md`。
