@@ -6,9 +6,9 @@
 - 当前阶段：第二阶段进行中
 - Java：`8+`
 - Spring Boot：`2.x / 3.x`
-- 当前 `flyway-digital-core` 测试总数：`94`
+- 当前 `flyway-digital-core` 测试总数：`91`
 - 当前总行覆盖率：约 `84.78%`
-- 当前状态：`mvn -pl flyway-digital-core verify` 已通过
+- 当前状态：`mvn -pl flyway-digital-core test` 已通过
 
 ## 模块说明
 
@@ -124,7 +124,7 @@ public class DatabaseMigration {
 第二阶段最优先的工作仍然是质量与可维护性：
 
 1. 持续补边界测试，防止后续回归。
-2. 持续性能评估并推进第一轮性能优化落地。
+2. 持续性能评估并验证第二轮扫描缓存优化的实际收益。
 3. 暂不优先启动 CLI、Plugin、回滚等第三阶段功能。
 
 ## 相关性能文档
@@ -138,3 +138,16 @@ public class DatabaseMigration {
 - 重点对比 `firstRunMs`、`secondRunMs` 与 `scanMs`，判断优化收益是否主要体现在首次链路或重复启动链路。
 - 每次优化后至少补 1 个边界/异常测试，避免性能改动引入行为回归。
 - 详细记录请同步更新 `PERFORMANCE_TESTING.md`。
+
+## 第二阶段性能优化当前落地点
+
+- 已完成第一轮低风险优化：`FlywayDigital` 历史记录一次性加载、已应用迁移日志降噪。
+- 已完成第二轮优化：`SqlScanner` 支持同 JVM 生命周期内的扫描结果缓存。
+- 当前缓存策略说明：
+  - 缓存键使用 `locations` 字符串。
+  - 文件系统 location 使用递归文件指纹做失效判断。
+  - classpath location 绑定当前 classLoader，避免不同上下文误命中。
+- 当前缓存回归测试：
+  - `mvn -pl flyway-digital-core "-Dtest=SqlScannerTest,SqlScannerCacheTest" test`
+- 当前下一步：
+  - 继续执行 benchmark 复测，确认缓存落地后 `secondRunMs` 是否出现稳定下降。

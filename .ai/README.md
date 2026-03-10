@@ -159,3 +159,9 @@ git commit -m "docs: record architecture decision - XXX"
 
 - 新增需求遵循 TDD 顺序：先写测试用例，再写业务逻辑代码。
 - 实现完成后，新增测试和存量测试都必须通过。
+
+## 最近一次上下文更新（2026-03-10）
+
+- 第二阶段性能优化第二轮已落地：完成 benchmark 复测，并在 `SqlScanner` 中实现同 JVM 生命周期扫描缓存。
+- 当前任务状态请优先查看 `current-task.md`。
+- 阶段与后续方向请优先查看 `roadmap.md`。

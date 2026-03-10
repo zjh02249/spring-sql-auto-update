@@ -5,10 +5,22 @@ import com.cbkj.infrastructure.model.SqlMigration;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import java.io.*;
+import java.io.BufferedReader;
+import java.io.File;
+import java.io.FileInputStream;
+import java.io.IOException;
+import java.io.InputStream;
+import java.io.InputStreamReader;
 import java.nio.charset.StandardCharsets;
-import java.util.*;
-import java.util.regex.Matcher;
+import java.util.ArrayList;
+import java.util.Collections;
+import java.util.Enumeration;
+import java.util.HashSet;
+import java.util.List;
+import java.util.Map;
+import java.util.Set;
+import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.atomic.AtomicLong;
 
 /**
  * SQL文件扫描器
@@ -23,6 +35,8 @@ import java.util.regex.Matcher;
 public class SqlScanner {
 
     private static final Logger LOGGER = LoggerFactory.getLogger(SqlScanner.class);
+    private static final Map<String, CacheEntry> SCAN_CACHE = new ConcurrentHashMap<String, CacheEntry>();
+    private static final AtomicLong CACHE_HITS = new AtomicLong(0L);
 
     private final String locations;
     private final MigrationFileParser fileParser;
@@ -37,48 +51,151 @@ public class SqlScanner {
     }
 
     /**
-     * 扫描所有配置的locations，返回找到的SQL迁移文件
+     * 扫描所有配置的 locations，返回找到的 SQL 迁移文件
      *
-     * @return 按版本号排序的SQL迁移列表
+     * @return 按版本号排序的 SQL 迁移列表
      */
     public List<SqlMigration> scan() {
+        List<String> normalizedLocations = normalizeLocations();
+        String cacheKey = buildCacheKey(normalizedLocations);
+        ScanFingerprint fingerprint = buildFingerprint(normalizedLocations);
+
         LOGGER.info("[SQLScanner] Starting scan for locations: {}", locations);
 
-        List<SqlMigration> migrations = new ArrayList<>();
-        String[] locationArray = locations.split(",");
+        CacheEntry cachedEntry = SCAN_CACHE.get(cacheKey);
+        if (cachedEntry != null && cachedEntry.matches(fingerprint)) {
+            CACHE_HITS.incrementAndGet();
+            List<SqlMigration> cachedMigrations = copyMigrations(cachedEntry.getMigrations());
+            LOGGER.info("[SQLScanner] Cache hit for locations: {}", cacheKey);
+            logScanComplete(cachedMigrations);
+            return cachedMigrations;
+        }
 
-        for (String location : locationArray) {
-            location = location.trim();
-            if (location.isEmpty()) {
-                continue;
-            }
-
+        List<SqlMigration> migrations = new ArrayList<SqlMigration>();
+        for (String location : normalizedLocations) {
             LOGGER.info("[SQLScanner] Scanning location: {}", location);
             List<SqlMigration> locationMigrations = scanLocation(location);
             migrations.addAll(locationMigrations);
         }
 
-        // 检查版本号重复
         checkForDuplicateVersions(migrations);
-
-        // 按版本号排序
         Collections.sort(migrations);
+        SCAN_CACHE.put(cacheKey, new CacheEntry(fingerprint, migrations));
 
-        LOGGER.info("[SQLScanner] Scan complete. Found {} migration(s)", migrations.size());
-        for (SqlMigration migration : migrations) {
-            LOGGER.info("[SQLScanner]   - {}: {}", migration.getVersion(), migration.getScript());
-        }
-
+        logScanComplete(migrations);
         return migrations;
     }
 
     /**
-     * 扫描单个location
+     * 仅供测试使用：清空扫描缓存。
+     */
+    static void clearCacheForTests() {
+        SCAN_CACHE.clear();
+        CACHE_HITS.set(0L);
+    }
+
+    /**
+     * 仅供测试使用：读取缓存命中次数。
+     */
+    static long getCacheHitCountForTests() {
+        return CACHE_HITS.get();
+    }
+
+    /**
+     * 仅供测试使用：读取缓存条目数量。
+     */
+    static int getCacheSizeForTests() {
+        return SCAN_CACHE.size();
+    }
+
+    private List<String> normalizeLocations() {
+        List<String> normalized = new ArrayList<String>();
+        String[] locationArray = locations.split(",");
+        for (String location : locationArray) {
+            String trimmed = location.trim();
+            if (!trimmed.isEmpty()) {
+                normalized.add(trimmed);
+            }
+        }
+        return normalized;
+    }
+
+    private String buildCacheKey(List<String> normalizedLocations) {
+        return String.join(",", normalizedLocations);
+    }
+
+    private ScanFingerprint buildFingerprint(List<String> normalizedLocations) {
+        List<String> locationFingerprints = new ArrayList<String>();
+        for (String location : normalizedLocations) {
+            locationFingerprints.add(buildLocationFingerprint(location));
+        }
+        return new ScanFingerprint(locationFingerprints);
+    }
+
+    private String buildLocationFingerprint(String location) {
+        if (location.startsWith("classpath:")) {
+            return buildClasspathFingerprint(location);
+        }
+        return buildFileSystemFingerprint(location);
+    }
+
+    private String buildClasspathFingerprint(String location) {
+        ClassLoader classLoader = Thread.currentThread().getContextClassLoader();
+        if (classLoader == null) {
+            classLoader = SqlScanner.class.getClassLoader();
+        }
+        return "classpath:" + location + "@loader:" + System.identityHashCode(classLoader);
+    }
+
+    private String buildFileSystemFingerprint(String path) {
+        File directory = new File(path);
+        String absolutePath = directory.getAbsolutePath();
+        if (!directory.exists()) {
+            return "fs:" + absolutePath + ":missing";
+        }
+        if (!directory.isDirectory()) {
+            return "fs:" + absolutePath + ":not-directory";
+        }
+
+        List<String> fileFingerprints = new ArrayList<String>();
+        collectFileFingerprints(directory, directory, fileFingerprints);
+        Collections.sort(fileFingerprints);
+        return "fs:" + absolutePath + ":" + String.join(";", fileFingerprints);
+    }
+
+    private void collectFileFingerprints(File root, File current, List<String> fileFingerprints) {
+        File[] files = current.listFiles();
+        if (files == null) {
+            return;
+        }
+
+        for (File file : files) {
+            if (file.isDirectory()) {
+                collectFileFingerprints(root, file, fileFingerprints);
+            } else if (file.getName().endsWith(".sql")) {
+                String relativePath = root.toURI().relativize(file.toURI()).getPath();
+                fileFingerprints.add(relativePath + "|" + file.length() + "|" + file.lastModified());
+            }
+        }
+    }
+
+    private List<SqlMigration> copyMigrations(List<SqlMigration> migrations) {
+        return new ArrayList<SqlMigration>(migrations);
+    }
+
+    private void logScanComplete(List<SqlMigration> migrations) {
+        LOGGER.info("[SQLScanner] Scan complete. Found {} migration(s)", migrations.size());
+        for (SqlMigration migration : migrations) {
+            LOGGER.info("[SQLScanner]   - {}: {}", migration.getVersion(), migration.getScript());
+        }
+    }
+
+    /**
+     * 扫描单个 location
      */
     private List<SqlMigration> scanLocation(String location) {
-        List<SqlMigration> migrations = new ArrayList<>();
+        List<SqlMigration> migrations = new ArrayList<SqlMigration>();
 
-        // 处理classpath:前缀
         if (location.startsWith("classpath:")) {
             String path = location.substring("classpath:".length());
             if (path.startsWith("/")) {
@@ -86,7 +203,6 @@ public class SqlScanner {
             }
             migrations.addAll(loadFromIndex(path));
         } else {
-            // 文件系统路径
             migrations.addAll(scanFileSystem(location));
         }
 
@@ -99,7 +215,7 @@ public class SqlScanner {
      * 如果 index 文件不存在，降级到传统扫描模式（用于开发和测试环境）
      */
     private List<SqlMigration> loadFromIndex(String path) {
-        List<SqlMigration> migrations = new ArrayList<>();
+        List<SqlMigration> migrations = new ArrayList<SqlMigration>();
         ClassLoader classLoader = Thread.currentThread().getContextClassLoader();
         if (classLoader == null) {
             classLoader = SqlScanner.class.getClassLoader();
@@ -126,7 +242,12 @@ public class SqlScanner {
                 }
 
                 String sqlContent = readInputStream(sqlStream);
-                SqlMigration migration = parseMigrationFile(fileName, "classpath:" + path, () -> sqlContent);
+                SqlMigration migration = parseMigrationFile(fileName, "classpath:" + path, new MigrationFileParser.ContentProvider() {
+                    @Override
+                    public String getContent() {
+                        return sqlContent;
+                    }
+                });
                 if (migration != null) {
                     migrations.add(migration);
                 }
@@ -142,7 +263,7 @@ public class SqlScanner {
      * 传统的 classpath 扫描模式（用于开发和测试环境的 fallback）
      */
     private List<SqlMigration> scanClasspathFallback(String path) {
-        List<SqlMigration> migrations = new ArrayList<>();
+        List<SqlMigration> migrations = new ArrayList<SqlMigration>();
 
         try {
             ClassLoader classLoader = Thread.currentThread().getContextClassLoader();
@@ -150,21 +271,19 @@ public class SqlScanner {
                 classLoader = SqlScanner.class.getClassLoader();
             }
 
-            java.util.Enumeration<java.net.URL> resources = classLoader.getResources(path);
+            Enumeration<java.net.URL> resources = classLoader.getResources(path);
 
             while (resources.hasMoreElements()) {
                 java.net.URL url = resources.nextElement();
                 LOGGER.info("[SQLScanner] Found classpath resource: {}", url);
 
                 if ("file".equals(url.getProtocol())) {
-                    java.io.File file = new java.io.File(url.toURI());
+                    File file = new File(url.toURI());
                     migrations.addAll(scanDirectory(file, "classpath:" + path));
                 } else if ("jar".equals(url.getProtocol())) {
-                    // 处理标准 JAR 和 Spring Boot nested JAR
                     String urlPath = url.getPath();
                     handleJarUrl(urlPath, path, migrations);
                 } else {
-                    // 尝试直接作为 JAR URL 处理
                     handleJarUrl(url.toString(), path, migrations);
                 }
             }
@@ -179,23 +298,14 @@ public class SqlScanner {
      * 扫描文件系统路径（用于开发环境）
      */
     private List<SqlMigration> scanFileSystem(String path) {
-        File directory = new File(path);
-        if (!directory.exists()) {
-            LOGGER.warn("[SQLScanner] Directory does not exist: {}", path);
-            return new ArrayList<>();
-        }
-        if (!directory.isDirectory()) {
-            LOGGER.warn("[SQLScanner] Path is not a directory: {}", path);
-            return new ArrayList<>();
-        }
-        return scanDirectory(directory, path);
+        return fileSystemScanner.scan(path);
     }
 
     /**
      * 递归扫描目录（用于开发环境）
      */
     private List<SqlMigration> scanDirectory(File directory, String basePath) {
-        List<SqlMigration> migrations = new ArrayList<>();
+        List<SqlMigration> migrations = new ArrayList<SqlMigration>();
 
         File[] files = directory.listFiles();
         if (files == null) {
@@ -204,7 +314,6 @@ public class SqlScanner {
 
         for (File file : files) {
             if (file.isDirectory()) {
-                // 递归扫描子目录
                 migrations.addAll(scanDirectory(file, basePath));
             } else if (file.getName().endsWith(".sql")) {
                 SqlMigration migration = parseMigrationFile(file, basePath);
@@ -222,11 +331,12 @@ public class SqlScanner {
      */
     private SqlMigration parseMigrationFile(File file, String basePath) {
         String fileName = file.getName();
-
-        // 使用ContentProvider读取文件内容
-        return parseMigrationFile(fileName, basePath, () -> {
-            try (FileInputStream fis = new FileInputStream(file)) {
-                return readInputStream(fis);
+        return parseMigrationFile(fileName, basePath, new MigrationFileParser.ContentProvider() {
+            @Override
+            public String getContent() throws IOException {
+                try (FileInputStream fis = new FileInputStream(file)) {
+                    return readInputStream(fis);
+                }
             }
         });
     }
@@ -238,13 +348,11 @@ public class SqlScanner {
         return fileParser.parse(fileName, location, contentProvider);
     }
 
-
-
     /**
      * 检查版本号重复
      */
     private void checkForDuplicateVersions(List<SqlMigration> migrations) {
-        java.util.Set<MigrationVersion> versions = new java.util.HashSet<>();
+        Set<MigrationVersion> versions = new HashSet<MigrationVersion>();
         for (SqlMigration migration : migrations) {
             if (!versions.add(migration.getVersion())) {
                 throw new IllegalStateException(
@@ -258,16 +366,11 @@ public class SqlScanner {
      */
     private void handleJarUrl(String urlPath, String entryPath, List<SqlMigration> migrations) {
         try {
-            // Spring Boot nested JAR 格式: jar:file:/path/to/app.jar!/BOOT-INF/classes!/db/migration
             if (urlPath.contains("BOOT-INF/classes!")) {
                 handleBootInfNestedJarUrl(urlPath, entryPath, migrations);
-            }
-            // Spring Boot 2.5+ nested JAR 格式: jar:nested:/path/to/app.jar/!BOOT-INF/classes!/db/migration
-            else if (urlPath.contains("nested:")) {
+            } else if (urlPath.contains("nested:")) {
                 handleNestedJarUrl(urlPath, entryPath, migrations);
-            }
-            // 标准 JAR 格式: jar:file:/path/to/app.jar!/db/migration
-            else {
+            } else {
                 String jarPath = urlPath;
                 if (jarPath.startsWith("file:")) {
                     jarPath = jarPath.substring(5);
@@ -287,17 +390,13 @@ public class SqlScanner {
      */
     private void handleBootInfNestedJarUrl(String urlPath, String entryPath, List<SqlMigration> migrations) {
         try {
-            // 格式: jar:file:/app/mat_search.jar!/BOOT-INF/classes!/dbUp
-
             LOGGER.info("[SQLScanner] Handling BOOT-INF nested JAR URL: {}", urlPath);
 
-            // 移除 jar: 前缀
             String remaining = urlPath;
             if (remaining.startsWith("jar:")) {
                 remaining = remaining.substring(4);
             }
 
-            // 提取主 JAR 路径
             String jarPath;
             if (remaining.contains("!")) {
                 jarPath = remaining.substring(0, remaining.indexOf("!"));
@@ -305,16 +404,12 @@ public class SqlScanner {
                 jarPath = remaining;
             }
 
-            // 移除 file: 前缀
             if (jarPath.startsWith("file:")) {
                 jarPath = jarPath.substring(5);
             }
 
             LOGGER.info("[SQLScanner] Main JAR path: {}", jarPath);
-
-            // 扫描 JAR 文件中的 BOOT-INF/classes 路径下的资源
             migrations.addAll(scanNestedJar(jarPath, "BOOT-INF/classes", entryPath));
-
         } catch (Exception e) {
             LOGGER.error("[SQLScanner] Error handling BOOT-INF nested JAR URL: {}", urlPath, e);
         }
@@ -326,46 +421,30 @@ public class SqlScanner {
      */
     private void handleNestedJarUrl(String urlPath, String entryPath, List<SqlMigration> migrations) {
         try {
-            // 解析 nested URL
-            // 格式: jar:nested:/path/app.jar/!BOOT-INF/classes!/db/migration
-            // 或: nested:/path/app.jar/!BOOT-INF/classes!/db/migration
-
             String remaining = urlPath;
 
-            // 移除 jar: 前缀
             if (remaining.startsWith("jar:")) {
                 remaining = remaining.substring(4);
             }
-
-            // 移除 nested: 前缀
             if (remaining.startsWith("nested:")) {
                 remaining = remaining.substring(7);
             }
 
-            // 现在 remaining 是: /path/app.jar/!BOOT-INF/classes!/db/migration
-            // 找到第一个 ! 之前的是主 JAR 路径
             int firstBang = remaining.indexOf("!");
             if (firstBang < 0) {
                 LOGGER.warn("[SQLScanner] Invalid nested URL format: {}", urlPath);
                 return;
             }
 
-            // 提取主 JAR 路径
             String mainJarPath = remaining.substring(0, firstBang);
-
-            // 提取内部路径（BOOT-INF/classes 之后的部分）
             String remainingPath = remaining.substring(firstBang + 1);
-
-            // 移除开头的 /
             if (remainingPath.startsWith("/")) {
                 remainingPath = remainingPath.substring(1);
             }
 
-            // 如果还有 !，说明有嵌套路径（如 BOOT-INF/classes!/db/migration）
             String nestedJarPath = null;
             int secondBang = remainingPath.indexOf("!");
             if (secondBang >= 0) {
-                // 格式: BOOT-INF/classes!/db/migration
                 nestedJarPath = remainingPath.substring(0, secondBang);
                 remainingPath = remainingPath.substring(secondBang + 1);
                 if (remainingPath.startsWith("/")) {
@@ -376,22 +455,16 @@ public class SqlScanner {
             LOGGER.info("[SQLScanner] Parsed nested JAR - main: {}, nested: {}, path: {}",
                     mainJarPath, nestedJarPath, remainingPath);
 
-            // 构建完整的 entry path
             String fullEntryPath = remainingPath;
             if (entryPath != null && !entryPath.isEmpty() && !fullEntryPath.equals(entryPath)) {
-                // 确保使用正确的路径
                 fullEntryPath = entryPath;
             }
 
-            // 扫描主 JAR
             if (nestedJarPath != null) {
-                // 需要扫描嵌套 JAR 内的内容
                 migrations.addAll(scanNestedJar(mainJarPath, nestedJarPath, fullEntryPath));
             } else {
-                // 直接扫描主 JAR 内的内容
                 migrations.addAll(scanJar(mainJarPath, fullEntryPath));
             }
-
         } catch (Exception e) {
             LOGGER.error("[SQLScanner] Error handling nested JAR URL: {}", urlPath, e);
         }
@@ -401,10 +474,10 @@ public class SqlScanner {
      * 扫描JAR文件
      */
     private List<SqlMigration> scanJar(String jarPath, String entryPath) {
-        List<SqlMigration> migrations = new ArrayList<>();
+        List<SqlMigration> migrations = new ArrayList<SqlMigration>();
 
         try (java.util.jar.JarFile jarFile = new java.util.jar.JarFile(jarPath)) {
-            java.util.Enumeration<java.util.jar.JarEntry> entries = jarFile.entries();
+            Enumeration<java.util.jar.JarEntry> entries = jarFile.entries();
 
             while (entries.hasMoreElements()) {
                 java.util.jar.JarEntry entry = entries.nextElement();
@@ -412,9 +485,12 @@ public class SqlScanner {
 
                 if (name.startsWith(entryPath) && name.endsWith(".sql")) {
                     String fileName = name.substring(name.lastIndexOf("/") + 1);
-                    SqlMigration migration = parseMigrationFile(fileName, "classpath:" + entryPath, () -> {
-                        try (InputStream is = jarFile.getInputStream(entry)) {
-                            return readInputStream(is);
+                    SqlMigration migration = parseMigrationFile(fileName, "classpath:" + entryPath, new MigrationFileParser.ContentProvider() {
+                        @Override
+                        public String getContent() throws IOException {
+                            try (InputStream is = jarFile.getInputStream(entry)) {
+                                return readInputStream(is);
+                            }
                         }
                     });
                     if (migration != null) {
@@ -433,16 +509,15 @@ public class SqlScanner {
      * 扫描 Spring Boot 嵌套 JAR
      *
      * @param mainJarPath 主 JAR 文件路径
-     * @param nestedPath 嵌套路径（如 BOOT-INF/classes）
+     * @param nestedPath 嵌套路徑（如 BOOT-INF/classes）
      * @param entryPath SQL 文件所在路径
      */
     private List<SqlMigration> scanNestedJar(String mainJarPath, String nestedPath, String entryPath) {
-        List<SqlMigration> migrations = new ArrayList<>();
+        List<SqlMigration> migrations = new ArrayList<SqlMigration>();
 
         try (java.util.jar.JarFile jarFile = new java.util.jar.JarFile(mainJarPath)) {
-            java.util.Enumeration<java.util.jar.JarEntry> entries = jarFile.entries();
+            Enumeration<java.util.jar.JarEntry> entries = jarFile.entries();
 
-            // 构建完整的搜索路径前缀
             String searchPrefix = nestedPath;
             if (!searchPrefix.endsWith("/")) {
                 searchPrefix = searchPrefix + "/";
@@ -460,14 +535,16 @@ public class SqlScanner {
                 java.util.jar.JarEntry entry = entries.nextElement();
                 String name = entry.getName();
 
-                // 检查是否匹配搜索路径且是 SQL 文件
                 if (name.startsWith(searchPrefix) && name.endsWith(".sql")) {
                     String fileName = name.substring(name.lastIndexOf("/") + 1);
                     LOGGER.info("[SQLScanner] Found SQL file in nested JAR: {}", name);
 
-                    SqlMigration migration = parseMigrationFile(fileName, "classpath:" + entryPath, () -> {
-                        try (InputStream is = jarFile.getInputStream(entry)) {
-                            return readInputStream(is);
+                    SqlMigration migration = parseMigrationFile(fileName, "classpath:" + entryPath, new MigrationFileParser.ContentProvider() {
+                        @Override
+                        public String getContent() throws IOException {
+                            try (InputStream is = jarFile.getInputStream(entry)) {
+                                return readInputStream(is);
+                            }
                         }
                     });
                     if (migration != null) {
@@ -478,7 +555,6 @@ public class SqlScanner {
 
             LOGGER.info("[SQLScanner] Scanned nested JAR {}:{}, found {} migration(s)",
                     mainJarPath, nestedPath, migrations.size());
-
         } catch (Exception e) {
             LOGGER.error("[SQLScanner] Error scanning nested JAR: {}:{}", mainJarPath, nestedPath, e);
         }
@@ -493,4 +569,46 @@ public class SqlScanner {
         return fileParser.readInputStream(inputStream);
     }
 
+    private static final class CacheEntry {
+        private final ScanFingerprint fingerprint;
+        private final List<SqlMigration> migrations;
+
+        private CacheEntry(ScanFingerprint fingerprint, List<SqlMigration> migrations) {
+            this.fingerprint = fingerprint;
+            this.migrations = new ArrayList<SqlMigration>(migrations);
+        }
+
+        private boolean matches(ScanFingerprint currentFingerprint) {
+            return fingerprint.equals(currentFingerprint);
+        }
+
+        private List<SqlMigration> getMigrations() {
+            return migrations;
+        }
+    }
+
+    private static final class ScanFingerprint {
+        private final List<String> locationFingerprints;
+
+        private ScanFingerprint(List<String> locationFingerprints) {
+            this.locationFingerprints = new ArrayList<String>(locationFingerprints);
+        }
+
+        @Override
+        public boolean equals(Object o) {
+            if (this == o) {
+                return true;
+            }
+            if (o == null || getClass() != o.getClass()) {
+                return false;
+            }
+            ScanFingerprint that = (ScanFingerprint) o;
+            return locationFingerprints.equals(that.locationFingerprints);
+        }
+
+        @Override
+        public int hashCode() {
+            return locationFingerprints.hashCode();
+        }
+    }
 }
