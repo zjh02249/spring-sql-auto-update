@@ -174,3 +174,32 @@ mvn -pl flyway-digital-core -Pperf-benchmark test-compile exec:java \
 
 - 评估 **同 JVM 生命周期内的扫描结果缓存策略**（仅对稳定 location 生效）。
 - 评估 `SqlScanner` 文件内容读取与解析过程中的对象分配开销。
+
+## 2026-03-10 Benchmark Refresh
+
+Command:
+
+```bash
+mvn -pl flyway-digital-core -Pperf-benchmark "-Dmaven.repo.local=D:\code\spring-sql-auto-update\.m2repo" test-compile exec:java "-Dexec.mainClass=com.cbkj.infrastructure.performance.PerformanceBenchmarkMain" "-Dperf.sizes=100,500,1000"
+```
+
+Results:
+
+| Scenario | Migrations | Scan / Total | First Run | Second Run | Notes |
+|------|------:|------:|------:|------:|------|
+| filesystem benchmark | 100 | 55ms | - | - | 0.55ms per file |
+| jar benchmark | 100 | 8ms | - | - | 0.08ms per file |
+| migration benchmark | 100 | 41ms | 465ms | 45ms | historyRows=100 |
+| filesystem benchmark | 500 | 246ms | - | - | 0.49ms per file |
+| jar benchmark | 500 | 21ms | - | - | 0.04ms per file |
+| migration benchmark | 500 | 153ms | 532ms | 616ms | historyRows=500 |
+| filesystem benchmark | 1000 | 280ms | - | - | 0.28ms per file |
+| jar benchmark | 1000 | 35ms | - | - | 0.04ms per file |
+| migration benchmark | 1000 | 281ms | 724ms | 287ms | historyRows=1000 |
+
+Observations:
+
+- `PerformanceSmokeTest` passed on 2026-03-10 with `Tests run: 6, Failures: 0, Errors: 0, Skipped: 0`.
+- The new idempotency checks passed for 100 and 500 migrations.
+- The second run is consistently non-destructive (`historyRows == migration count`), but the 500-case second run was slower than its first run in this sample and should be rerun before drawing optimization conclusions.
+- Jar scanning remains materially cheaper than filesystem scanning in this environment.
