@@ -438,9 +438,36 @@ public class SqlExecutorTest {
         org.h2.jdbcx.JdbcDataSource ds = new org.h2.jdbcx.JdbcDataSource();
         ds.setURL("jdbc:h2:mem:test;MODE=MYSQL");
         SqlExecutor executor = new SqlExecutor(ds);
-        
+
         java.lang.reflect.Method method = SqlExecutor.class.getDeclaredMethod("restoreAutoCommitMode", java.sql.Connection.class, boolean.class);
         assertNotNull("应存在 restoreAutoCommitMode 方法", method);
+    }
+
+    // ==================== DELIMITER 支持测试用例 ====================
+
+    /**
+     * 测试 isAtLineStart 方法 - 行首检测
+     */
+    @Test
+    public void testIsAtLineStart() throws Exception {
+        java.lang.reflect.Method method = SqlExecutor.class.getDeclaredMethod("isAtLineStart", String.class, int.class);
+        method.setAccessible(true);
+
+        org.h2.jdbcx.JdbcDataSource ds = new org.h2.jdbcx.JdbcDataSource();
+        ds.setURL("jdbc:h2:mem:test;");
+        SqlExecutor executor = new SqlExecutor(ds);
+
+        // 测试绝对行首（index=0）
+        assertTrue("index 0 应为行首", (Boolean) method.invoke(executor, "DELIMITER ;;", 0));
+
+        // 测试换行后的行首
+        assertTrue("换行后应为行首", (Boolean) method.invoke(executor, "\nDELIMITER ;;", 1));
+
+        // 测试非行首（中间位置）
+        assertFalse("中间位置不应为行首", (Boolean) method.invoke(executor, "DELIMITER ;;", 5));
+
+        // 测试空白后的行首
+        assertTrue("空白后应为行首", (Boolean) method.invoke(executor, "   DELIMITER ;;", 3));
     }
 
 

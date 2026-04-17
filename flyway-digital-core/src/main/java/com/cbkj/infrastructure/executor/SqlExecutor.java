@@ -610,6 +610,27 @@ public class SqlExecutor {
     }
 
     /**
+     * 检查当前位置是否为行首（前面只有空白或换行）
+     *
+     * @param sqlContent SQL 内容
+     * @param index 当前位置
+     * @return 是否为行首
+     */
+    private boolean isAtLineStart(String sqlContent, int index) {
+        while (index > 0) {
+            char prev = sqlContent.charAt(index - 1);
+            if (prev == '\n') {
+                return true;
+            }
+            if (!Character.isWhitespace(prev)) {
+                return false;
+            }
+            index--;
+        }
+        return true;
+    }
+
+    /**
      * 是否为 DDL 语句
      */
     private boolean isDdlStatement(String statement) {
