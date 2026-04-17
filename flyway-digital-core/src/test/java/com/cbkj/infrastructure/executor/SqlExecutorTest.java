@@ -470,5 +470,38 @@ public class SqlExecutorTest {
         assertTrue("空白后应为行首", (Boolean) method.invoke(executor, "   DELIMITER ;;", 3));
     }
 
+    /**
+     * 测试 extractDelimiterCommand 方法 - DELIMITER 命令提取
+     */
+    @Test
+    public void testExtractDelimiterCommand() throws Exception {
+        java.lang.reflect.Method method = SqlExecutor.class.getDeclaredMethod("extractDelimiterCommand", String.class, int.class);
+        method.setAccessible(true);
+
+        org.h2.jdbcx.JdbcDataSource ds = new org.h2.jdbcx.JdbcDataSource();
+        ds.setURL("jdbc:h2:mem:test;");
+        SqlExecutor executor = new SqlExecutor(ds);
+
+        // 测试 DELIMITER ;;
+        String result1 = (String) method.invoke(executor, "DELIMITER ;;", 0);
+        assertEquals(";;", result1);
+
+        // 测试 DELIMITER $$ (MySQL 常见)
+        String result2 = (String) method.invoke(executor, "DELIMITER $$", 0);
+        assertEquals("$$", result2);
+
+        // 测试 DELIMITER ; (恢复默认)
+        String result3 = (String) method.invoke(executor, "DELIMITER ;", 0);
+        assertEquals(";", result3);
+
+        // 测试非 DELIMITER 语句（返回 null）
+        String result4 = (String) method.invoke(executor, "SELECT * FROM t", 0);
+        assertNull(result4);
+
+        // 测试大小写不敏感
+        String result5 = (String) method.invoke(executor, "delimiter ;;", 0);
+        assertEquals(";;", result5);
+    }
+
 
 }

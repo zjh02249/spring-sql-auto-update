@@ -631,6 +631,25 @@ public class SqlExecutor {
     }
 
     /**
+     * 提取 DELIMITER 后的分隔符
+     *
+     * @param sqlContent SQL 内容
+     * @param index 当前位置
+     * @return 分隔符字符串，如果不是 DELIMITER 命令则返回 null
+     */
+    private String extractDelimiterCommand(String sqlContent, int index) {
+        String remaining = sqlContent.substring(index).trim();
+        if (remaining.toUpperCase().startsWith("DELIMITER")) {
+            String delimiter = remaining.substring(9).trim();
+            if (delimiter.isEmpty()) {
+                delimiter = ";";
+            }
+            return delimiter;
+        }
+        return null;
+    }
+
+    /**
      * 是否为 DDL 语句
      */
     private boolean isDdlStatement(String statement) {
