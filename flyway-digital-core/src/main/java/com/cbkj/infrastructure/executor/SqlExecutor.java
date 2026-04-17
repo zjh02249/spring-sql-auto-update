@@ -469,9 +469,24 @@ public class SqlExecutor {
                 }
             }
 
-            // 处理单引号字符串
+            // 处理单引号字符串（支持 SQL 标准 '' 转义和反斜杠 \' 转义）
             if (!inLineComment && !inBlockComment && !inDoubleQuote) {
-                if (c == '\'' && (i == 0 || sqlContent.charAt(i - 1) != '\\')) {
+                if (c == '\'') {
+                    // 检查 SQL 标准转义: '' (两个单引号表示一个单引号字符)
+                    if (nextChar == '\'') {
+                        // '' 表示转义的单引号，不结束字符串，跳过两个字符
+                        currentStatement.append(c);
+                        currentStatement.append(nextChar);
+                        i++;
+                        continue;
+                    }
+                    // 检查反斜杠转义: \' (部分数据库支持)
+                    if (i > 0 && sqlContent.charAt(i - 1) == '\\') {
+                        // 已是转义状态，不切换字符串状态
+                        currentStatement.append(c);
+                        continue;
+                    }
+                    // 普通单引号，切换字符串状态
                     inSingleQuote = !inSingleQuote;
                 }
             }

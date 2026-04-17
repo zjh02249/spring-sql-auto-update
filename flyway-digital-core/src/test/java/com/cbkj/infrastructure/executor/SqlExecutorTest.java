@@ -503,5 +503,31 @@ public class SqlExecutorTest {
         assertEquals(";;", result5);
     }
 
+    // ==================== SQL 标准引号转义测试用例 ====================
+
+    /**
+     * 测试 SQL 标准引号转义 - 双单引号表示单引号字符
+     */
+    @Test
+    public void testSqlStandardQuoteEscape() throws Exception {
+        // 测试 It's a test
+        String sql1 = "INSERT INTO t (name) VALUES ('It''s a test');";
+        String[] result1 = splitSqlStatements(sql1);
+        assertEquals("应返回 1 条语句", 1, result1.length);
+        assertTrue("应包含转义引号", result1[0].contains("'It''s a test'"));
+
+        // 测试 O'Reilly's book
+        String sql2 = "INSERT INTO t (msg) VALUES ('O''Reilly''s book');";
+        String[] result2 = splitSqlStatements(sql2);
+        assertEquals("应返回 1 条语句", 1, result2.length);
+        assertTrue("应包含多重转义", result2[0].contains("'O''Reilly''s book'"));
+
+        // 测试混合场景 - 普通语句 + 转义引号
+        String sql3 = "SELECT * FROM t; INSERT INTO t (name) VALUES ('It''s test'); DELETE FROM t;";
+        String[] result3 = splitSqlStatements(sql3);
+        assertEquals("应返回 3 条语句", 3, result3.length);
+        assertTrue("第二条应包含转义", result3[1].contains("'It''s test'"));
+    }
+
 
 }
