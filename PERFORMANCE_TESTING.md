@@ -175,6 +175,40 @@ mvn -pl flyway-digital-core -Pperf-benchmark test-compile exec:java \
 - 评估 **同 JVM 生命周期内的扫描结果缓存策略**（仅对稳定 location 生效）。
 - 评估 `SqlScanner` 文件内容读取与解析过程中的对象分配开销。
 
+## 第二轮优化点（已落地）
+
+根据复测结论“`secondRunMs` 持续贴近 `scanMs`”，本轮已将优化重点从 history 过滤链路切换到 `SqlScanner` 重复扫描链路，并落地以下改动：
+
+1. **同 JVM 生命周期内的扫描结果缓存**
+   - `SqlScanner` 以 `locations` 字符串作为缓存键。
+   - 缓存命中时直接复用已排序的 `SqlMigration` 列表，避免重复读取 SQL 内容和重复解析。
+
+2. **文件系统 location 的缓存失效判断**
+   - 递归采集 SQL 文件的相对路径、文件大小和最后修改时间，构造文件指纹。
+   - 只要文件内容、数量或路径变化，下一次扫描就会自动失效并重新读取。
+
+3. **classpath location 的安全隔离**
+   - classpath 指纹绑定当前 classLoader。
+   - 避免测试、fallback 扫描或不同上下文 classpath 场景误命中缓存。
+
+## 第二轮优化验证
+
+- 新增 `SqlScannerCacheTest`，覆盖：
+  - 稳定文件系统 location 重复扫描命中缓存。
+  - SQL 文件内容变化后缓存失效并重新计算 checksum。
+- 回归验证结果：
+  - `mvn -pl flyway-digital-core "-Dtest=SqlScannerTest,SqlScannerCacheTest" test` 通过
+  - `mvn -pl flyway-digital-core test` 通过
+
+## 第二轮后的下一步建议
+
+- 重新执行 `100 / 500 / 1000` benchmark，验证缓存落地后 `secondRunMs` 是否稳定下降。
+- 若 `secondRunMs` 仍明显高于预期，再继续拆分：
+  - 文件指纹构建本身的开销
+  - 大批量结果日志输出开销
+  - 对象分配与字符串构建开销
+- 在没有新的 benchmark 结果前，不宣称第二轮优化已带来确定的绝对耗时下降，只确认其方向与行为已落地并通过测试。
+
 ## 2026-03-10 Benchmark Refresh
 
 Command:
