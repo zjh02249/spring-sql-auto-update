@@ -438,9 +438,167 @@ public class SqlExecutorTest {
         org.h2.jdbcx.JdbcDataSource ds = new org.h2.jdbcx.JdbcDataSource();
         ds.setURL("jdbc:h2:mem:test;MODE=MYSQL");
         SqlExecutor executor = new SqlExecutor(ds);
-        
+
         java.lang.reflect.Method method = SqlExecutor.class.getDeclaredMethod("restoreAutoCommitMode", java.sql.Connection.class, boolean.class);
         assertNotNull("应存在 restoreAutoCommitMode 方法", method);
+    }
+
+    // ==================== DELIMITER 支持测试用例 ====================
+
+    /**
+     * 测试 isAtLineStart 方法 - 行首检测
+     */
+    @Test
+    public void testIsAtLineStart() throws Exception {
+        java.lang.reflect.Method method = SqlExecutor.class.getDeclaredMethod("isAtLineStart", String.class, int.class);
+        method.setAccessible(true);
+
+        org.h2.jdbcx.JdbcDataSource ds = new org.h2.jdbcx.JdbcDataSource();
+        ds.setURL("jdbc:h2:mem:test;");
+        SqlExecutor executor = new SqlExecutor(ds);
+
+        // 测试绝对行首（index=0）
+        assertTrue("index 0 应为行首", (Boolean) method.invoke(executor, "DELIMITER ;;", 0));
+
+        // 测试换行后的行首
+        assertTrue("换行后应为行首", (Boolean) method.invoke(executor, "\nDELIMITER ;;", 1));
+
+        // 测试非行首（中间位置）
+        assertFalse("中间位置不应为行首", (Boolean) method.invoke(executor, "DELIMITER ;;", 5));
+
+        // 测试空白后的行首
+        assertTrue("空白后应为行首", (Boolean) method.invoke(executor, "   DELIMITER ;;", 3));
+    }
+
+    /**
+     * 测试 extractDelimiterCommand 方法 - DELIMITER 命令提取
+     */
+    @Test
+    public void testExtractDelimiterCommand() throws Exception {
+        java.lang.reflect.Method method = SqlExecutor.class.getDeclaredMethod("extractDelimiterCommand", String.class, int.class);
+        method.setAccessible(true);
+
+        org.h2.jdbcx.JdbcDataSource ds = new org.h2.jdbcx.JdbcDataSource();
+        ds.setURL("jdbc:h2:mem:test;");
+        SqlExecutor executor = new SqlExecutor(ds);
+
+        // 测试 DELIMITER ;;
+        String result1 = (String) method.invoke(executor, "DELIMITER ;;", 0);
+        assertEquals(";;", result1);
+
+        // 测试 DELIMITER $$ (MySQL 常见)
+        String result2 = (String) method.invoke(executor, "DELIMITER $$", 0);
+        assertEquals("$$", result2);
+
+        // 测试 DELIMITER ; (恢复默认)
+        String result3 = (String) method.invoke(executor, "DELIMITER ;", 0);
+        assertEquals(";", result3);
+
+        // 测试非 DELIMITER 语句（返回 null）
+        String result4 = (String) method.invoke(executor, "SELECT * FROM t", 0);
+        assertNull(result4);
+
+        // 测试大小写不敏感
+        String result5 = (String) method.invoke(executor, "delimiter ;;", 0);
+        assertEquals(";;", result5);
+    }
+
+    // ==================== SQL 标准引号转义测试用例 ====================
+
+    /**
+     * 测试 SQL 标准引号转义 - 双单引号表示单引号字符
+     */
+    @Test
+    public void testSqlStandardQuoteEscape() throws Exception {
+        // 测试 It's a test
+        String sql1 = "INSERT INTO t (name) VALUES ('It''s a test');";
+        String[] result1 = splitSqlStatements(sql1);
+        assertEquals("应返回 1 条语句", 1, result1.length);
+        assertTrue("应包含转义引号", result1[0].contains("'It''s a test'"));
+
+        // 测试 O'Reilly's book
+        String sql2 = "INSERT INTO t (msg) VALUES ('O''Reilly''s book');";
+        String[] result2 = splitSqlStatements(sql2);
+        assertEquals("应返回 1 条语句", 1, result2.length);
+        assertTrue("应包含多重转义", result2[0].contains("'O''Reilly''s book'"));
+
+        // 测试混合场景 - 普通语句 + 转义引号
+        String sql3 = "SELECT * FROM t; INSERT INTO t (name) VALUES ('It''s test'); DELETE FROM t;";
+        String[] result3 = splitSqlStatements(sql3);
+        assertEquals("应返回 3 条语句", 3, result3.length);
+        assertTrue("第二条应包含转义", result3[1].contains("'It''s test'"));
+    }
+
+    // ==================== DELIMITER 分割测试用例 ====================
+
+    /**
+     * 测试 MySQL 存储过程定义 - DELIMITER 语法
+     */
+    @Test
+    public void testDelimiterProcedure() throws Exception {
+        String sql = "DELIMITER ;;\n" +
+                "CREATE PROCEDURE my_proc()\n" +
+                "BEGIN\n" +
+                "  SELECT * FROM users;\n" +
+                "  INSERT INTO logs VALUES (1);\n" +
+                "END;;\n" +
+                "DELIMITER ;";
+
+        String[] result = splitSqlStatements(sql);
+
+        // Debug: print results
+        System.out.println("[DEBUG] Result count: " + result.length);
+        for (int i = 0; i < result.length; i++) {
+            String stmt = result[i];
+            String preview = stmt.length() > 50 ? stmt.substring(0, 50) + "..." : stmt;
+            System.out.println("[DEBUG] Statement " + i + " (len=" + stmt.length() + "): [" + preview + "]");
+        }
+
+        // DELIMITER 语句作为独立语句（执行时会被过滤）
+        assertEquals("应返回 3 条语句（DELIMITER, CREATE PROCEDURE, DELIMITER）", 3, result.length);
+        assertTrue("第一条应为 DELIMITER", result[0].toUpperCase().startsWith("DELIMITER"));
+        assertTrue("第二条应为 CREATE PROCEDURE", result[1].toUpperCase().contains("CREATE PROCEDURE"));
+        assertTrue("CREATE PROCEDURE 应完整", result[1].contains("BEGIN") && result[1].contains("END"));
+        assertTrue("第三条应为 DELIMITER", result[2].toUpperCase().startsWith("DELIMITER"));
+    }
+
+    /**
+     * 测试 MySQL 触发器定义 - DELIMITER 语法
+     */
+    @Test
+    public void testDelimiterTrigger() throws Exception {
+        String sql = "DELIMITER $$\n" +
+                "CREATE TRIGGER my_trigger\n" +
+                "BEFORE INSERT ON t\n" +
+                "FOR EACH ROW\n" +
+                "BEGIN\n" +
+                "  INSERT INTO logs VALUES (NEW.id);\n" +
+                "END$$\n" +
+                "DELIMITER ;";
+
+        String[] result = splitSqlStatements(sql);
+
+        assertEquals("应返回 3 条语句", 3, result.length);
+        assertTrue("第二条应为 CREATE TRIGGER", result[1].toUpperCase().contains("CREATE TRIGGER"));
+        assertTrue("CREATE TRIGGER 应完整", result[1].contains("BEGIN") && result[1].contains("END"));
+    }
+
+    /**
+     * 测试 DELIMITER 恢复后继续正常分割
+     */
+    @Test
+    public void testDelimiterRestore() throws Exception {
+        String sql = "DELIMITER ;;\n" +
+                "CREATE PROCEDURE p1() BEGIN SELECT 1; END;;\n" +
+                "DELIMITER ;\n" +
+                "SELECT * FROM users;\n" +
+                "INSERT INTO logs VALUES (1);";
+
+        String[] result = splitSqlStatements(sql);
+
+        assertEquals("应返回 5 条语句", 5, result.length);
+        assertTrue("第四条应为 SELECT", result[3].toUpperCase().startsWith("SELECT"));
+        assertTrue("第五条应为 INSERT", result[4].toUpperCase().startsWith("INSERT"));
     }
 
 

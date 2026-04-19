@@ -349,6 +349,13 @@ public class SqlExecutor {
                 continue;
             }
 
+            // 跳过 DELIMITER 语句（MySQL 语法，用于存储过程/触发器定义）
+            if (trimmedStatement.toUpperCase().startsWith("DELIMITER")) {
+                LOGGER.debug("[SqlExecutor] [PATH:{}] Skipping DELIMITER statement: {}",
+                        scriptName, trimmedStatement);
+                continue;
+            }
+
             statementCount++;
             String targetNamespace = extractNamespace(trimmedStatement);
             boolean switchedToTarget = false;
@@ -433,9 +440,43 @@ public class SqlExecutor {
         int plsqlDepth = 0;
         boolean inDeclareSection = false;
 
+        // DELIMITER support for MySQL stored procedures/triggers
+        String currentDelimiter = ";";
+
         for (int i = 0; i < sqlContent.length(); i++) {
             char c = sqlContent.charAt(i);
             char nextChar = (i + 1 < sqlContent.length()) ? sqlContent.charAt(i + 1) : '\0';
+
+            // 检测 DELIMITER 命令（仅在行首，不在字符串或注释中）
+            if (!inSingleQuote && !inDoubleQuote && !inLineComment && !inBlockComment && plsqlDepth == 0) {
+                if (isAtLineStart(sqlContent, i)) {
+                    String newDelimiter = extractDelimiterCommand(sqlContent, i);
+                    if (newDelimiter != null) {
+                        // 先分割当前语句（如果有内容）
+                        String currentStmt = currentStatement.toString().trim();
+                        if (!currentStmt.isEmpty()) {
+                            statements.add(currentStmt);
+                        }
+                        currentStatement = new StringBuilder();
+
+                        currentDelimiter = newDelimiter;
+                        // 收集 DELIMITER 行作为独立语句
+                        int startIndex = i;
+                        while (i < sqlContent.length() && sqlContent.charAt(i) != '\n') {
+                            currentStatement.append(sqlContent.charAt(i));
+                            i++;
+                        }
+                        // 不消耗换行符，让下一次循环处理
+                        String stmt = currentStatement.toString().trim();
+                        if (!stmt.isEmpty()) {
+                            statements.add(stmt);
+                        }
+                        currentStatement = new StringBuilder();
+                        // 注意：i 现在停在换行符上，for 循环的 i++ 会跳过换行符
+                        continue;
+                    }
+                }
+            }
 
             // 处理块注释 /* */
             if (!inSingleQuote && !inDoubleQuote && !inLineComment) {
@@ -466,12 +507,29 @@ public class SqlExecutor {
                 }
                 if (inLineComment && c == '\n') {
                     inLineComment = false;
+                    currentStatement.append(c);
+                    continue;  // 添加continue，让下一次循环在行首检测DELIMITER
                 }
             }
 
-            // 处理单引号字符串
+            // 处理单引号字符串（支持 SQL 标准 '' 转义和反斜杠 \' 转义）
             if (!inLineComment && !inBlockComment && !inDoubleQuote) {
-                if (c == '\'' && (i == 0 || sqlContent.charAt(i - 1) != '\\')) {
+                if (c == '\'') {
+                    // 检查 SQL 标准转义: '' (两个单引号表示一个单引号字符)
+                    if (nextChar == '\'') {
+                        // '' 表示转义的单引号，不结束字符串，跳过两个字符
+                        currentStatement.append(c);
+                        currentStatement.append(nextChar);
+                        i++;
+                        continue;
+                    }
+                    // 检查反斜杠转义: \' (部分数据库支持)
+                    if (i > 0 && sqlContent.charAt(i - 1) == '\\') {
+                        // 已是转义状态，不切换字符串状态
+                        currentStatement.append(c);
+                        continue;
+                    }
+                    // 普通单引号，切换字符串状态
                     inSingleQuote = !inSingleQuote;
                 }
             }
@@ -507,19 +565,35 @@ public class SqlExecutor {
                 }
             }
 
-            // 处理语句分割
-            if (c == ';'
+            // 处理语句分割（支持自定义 DELIMITER）
+            boolean isDelimiterEnd = false;
+            if (currentDelimiter.equals(";")) {
+                isDelimiterEnd = (c == ';');
+            } else {
+                // 检查是否匹配自定义分隔符
+                if (i + currentDelimiter.length() <= sqlContent.length()) {
+                    String potentialDelimiter = sqlContent.substring(i, i + currentDelimiter.length());
+                    isDelimiterEnd = potentialDelimiter.equals(currentDelimiter);
+                }
+            }
+
+            if (isDelimiterEnd
                     && !inSingleQuote
                     && !inDoubleQuote
                     && !inLineComment
-                    && !inBlockComment
-                    && plsqlDepth == 0) {
-                String stmt = currentStatement.toString().trim();
-                if (!stmt.isEmpty()) {
-                    statements.add(stmt);
+                    && !inBlockComment) {
+                if (plsqlDepth == 0) {
+                    String stmt = currentStatement.toString().trim();
+                    if (!stmt.isEmpty()) {
+                        statements.add(stmt);
+                    }
+                    currentStatement = new StringBuilder();
+                    // 如果是自定义分隔符，跳过分隔符的剩余字符
+                    if (!currentDelimiter.equals(";")) {
+                        i += currentDelimiter.length() - 1;
+                    }
+                    continue;
                 }
-                currentStatement = new StringBuilder();
-                continue;
             }
 
             currentStatement.append(c);
@@ -607,6 +681,59 @@ public class SqlExecutor {
         }
 
         return true;
+    }
+
+    /**
+     * 检查当前位置是否为行首（前面只有空白或换行）
+     *
+     * @param sqlContent SQL 内容
+     * @param index 当前位置
+     * @return 是否为行首
+     */
+    private boolean isAtLineStart(String sqlContent, int index) {
+        while (index > 0) {
+            char prev = sqlContent.charAt(index - 1);
+            if (prev == '\n') {
+                return true;
+            }
+            if (!Character.isWhitespace(prev)) {
+                return false;
+            }
+            index--;
+        }
+        return true;
+    }
+
+    /**
+     * 提取 DELIMITER 后的分隔符
+     *
+     * @param sqlContent SQL 内容
+     * @param index 当前位置
+     * @return 分隔符字符串，如果不是 DELIMITER 命令则返回 null
+     */
+    private String extractDelimiterCommand(String sqlContent, int index) {
+        // 从当前位置开始，找到行尾
+        int lineEnd = index;
+        while (lineEnd < sqlContent.length() && sqlContent.charAt(lineEnd) != '\n') {
+            lineEnd++;
+        }
+        String line = sqlContent.substring(index, lineEnd).trim();
+
+        if (line.toUpperCase().startsWith("DELIMITER")) {
+            // 提取 DELIMITER 后的分隔符（只取第一个词）
+            String afterDelimiter = line.substring(9).trim();
+            // 分隔符是第一个非空白序列（直到遇到空白或行尾）
+            int delimEnd = 0;
+            while (delimEnd < afterDelimiter.length() && !Character.isWhitespace(afterDelimiter.charAt(delimEnd))) {
+                delimEnd++;
+            }
+            String delimiter = afterDelimiter.substring(0, delimEnd);
+            if (delimiter.isEmpty()) {
+                delimiter = ";";
+            }
+            return delimiter;
+        }
+        return null;
     }
 
     /**

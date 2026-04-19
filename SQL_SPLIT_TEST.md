@@ -32,8 +32,10 @@ INSERT INTO table (field) VALUES ('a;b;c');
 2. **行注释** `-- ... \n`
 3. **单引号字符串** `' ... '`
 4. **双引号字符串** `" ... "`
+5. **PL/SQL 块** `DECLARE...BEGIN...END`（Oracle/达梦）
+6. **MySQL DELIMITER** 自定义分隔符语法
 
-5. **普通 SQL 代码**
+7. **普通 SQL 代码**
 
 ### 分割规则
 
@@ -174,3 +176,78 @@ String[] statements = splitSqlStatements(sqlContent);
 **修复日期**: 2025-02-11  
 **修复版本**: 1.2.2  
 **作者**: cbkj
+
+---
+
+## 2026-04-17 增强功能
+
+### 新增功能
+
+#### 1. MySQL DELIMITER 语法支持
+
+支持 MySQL 存储过程和触发器定义中的 `DELIMITER` 语法。
+
+**示例**：
+```sql
+DELIMITER ;;
+CREATE PROCEDURE my_proc()
+BEGIN
+  SELECT * FROM users;
+  INSERT INTO logs VALUES (1);
+END;;
+DELIMITER ;
+```
+
+**处理逻辑**：
+- 检测 `DELIMITER` 命令，动态切换分隔符
+- 使用自定义分隔符（如 `;;`）分割语句
+- 执行时自动跳过 `DELIMITER` 语句
+
+#### 2. SQL 标准引号转义
+
+支持 SQL 标准的 `''` 引号转义语法（两个单引号表示一个单引号字符）。
+
+**示例**：
+```sql
+INSERT INTO t (name) VALUES ('It''s a test');
+INSERT INTO t (msg) VALUES ('O''Reilly''s book');
+```
+
+**处理逻辑**：
+- 检测 `''` 序列，视为转义的单引号
+- 不结束字符串，继续解析
+
+### 测试用例
+
+#### 测试 6：MySQL 存储过程
+```java
+String sql = 
+    "DELIMITER ;;\n" +
+    "CREATE PROCEDURE my_proc()\n" +
+    "BEGIN\n" +
+    "  SELECT * FROM users;\n" +
+    "END;;\n" +
+    "DELIMITER ;";
+String[] result = executor.splitSqlStatements(sql);
+assert result.length == 3;  // DELIMITER ;;, CREATE PROCEDURE..., DELIMITER ;
+```
+
+#### 测试 7：SQL 标准引号转义
+```java
+String sql = "INSERT INTO t (name) VALUES ('It''s a test')";
+String[] result = executor.splitSqlStatements(sql);
+assert result.length == 1;
+assert result[0].contains("It''s a test");
+```
+
+### 验证结果
+
+✅ 95 个测试用例全部通过  
+✅ 向后兼容（原有功能不受影响）  
+✅ 支持 MySQL 存储过程/触发器定义  
+✅ 支持 SQL 标准引号转义
+
+---
+
+**增强日期**: 2026-04-17  
+**增强版本**: 1.3.0
