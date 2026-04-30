@@ -129,7 +129,7 @@ public class HistoryRepository {
             stmt.setString(7, migration.getInstalledBy());
             stmt.setTimestamp(8, migration.getInstalledOn());
             stmt.setInt(9, migration.getExecutionTime());
-            stmt.setBoolean(10, migration.isSuccess());
+            stmt.setInt(10, migration.isSuccess() ? 1 : 0);
 
             stmt.executeUpdate();
 
@@ -204,7 +204,7 @@ public class HistoryRepository {
         migration.setInstalledBy(rs.getString("installed_by"));
         migration.setInstalledOn(rs.getTimestamp("installed_on"));
         migration.setExecutionTime(rs.getInt("execution_time"));
-        migration.setSuccess(rs.getBoolean("success"));
+        migration.setSuccess(rs.getInt("success") == 1);
         
         return migration;
     }
@@ -246,7 +246,7 @@ public class HistoryRepository {
         try (Connection connection = dataSource.getConnection();
              PreparedStatement stmt = connection.prepareStatement(sql)) {
             stmt.setString(1, version);
-            stmt.setBoolean(2, success);
+            stmt.setInt(2, success ? 1 : 0);
 
             try (ResultSet rs = stmt.executeQuery()) {
                 if (rs.next()) {
